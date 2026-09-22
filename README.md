@@ -63,29 +63,29 @@ Claude Code then decides, in this order, to:
 
 ```mermaid
 flowchart TD
-    U[User] --> CC[Claude Code 2.1.278<br/>single interface and orchestrator]
+    U[User] --> CC["Claude Code 2.1.278<br/>single interface and orchestrator"]
 
-    CC --> DET[Deterministic layer<br/>filesystem, git, ripgrep, compiler, tests]
-    CC --> GR[Graphify 0.9.61<br/>local AST knowledge graph]
-    CC --> SK[Skills<br/>ai-router, ui-design-system, jev, document skills]
+    CC --> DET["Deterministic layer<br/>filesystem, git, ripgrep, compiler, tests"]
+    CC --> GR["Graphify 0.9.61<br/>local AST knowledge graph"]
+    CC --> SK["Skills<br/>ai-router, ui-design-system, jev, document skills"]
 
-    DET --> R{AI router<br/>~/.claude/ai-router.json}
+    DET --> R{"AI router<br/>~/.claude/ai-router.json"}
     GR --> R
     SK --> R
 
-    R -->|default| CL[Claude<br/>reasoning, planning, integration]
-    R -->|bounded implementation<br/>or independent review| CX[Codex<br/>codex-worker.sh]
-    R -->|large context analysis<br/>or second opinion| GM[Gemini<br/>gemini-worker.sh via agy]
-    R -.->|prepared, inactive<br/>no TYPESAFE_API_KEY| JV[Jev<br/>MCP server]
+    R -->|default| CL["Claude<br/>reasoning, planning, integration"]
+    R -->|bounded implementation<br/>or independent review| CX["Codex<br/>codex-worker.sh"]
+    R -->|large context analysis<br/>or second opinion| GM["Gemini<br/>gemini-worker.sh via agy"]
+    R -.->|prepared, inactive<br/>no TYPESAFE_API_KEY| JV["Jev<br/>MCP server"]
 
-    CL --> V[Validation<br/>tests, source reading, git]
+    CL --> V["Validation<br/>tests, source reading, git"]
     CX --> V
     GM --> V
     JV -.-> V
 
     V --> CC2[Claude writes the final answer]
-    CC2 --> AD[i-have-adhd<br/>structure: action first, numbered steps, next action]
-    AD --> CV[Caveman<br/>wording: compressed, no filler]
+    CC2 --> AD["i-have-adhd<br/>structure: action first, numbered steps, next action"]
+    AD --> CV["Caveman<br/>wording: compressed, no filler"]
     CV --> U
 ```
 

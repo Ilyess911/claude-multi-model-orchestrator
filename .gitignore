@@ -1,0 +1,64 @@
+# Secrets and credentials
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*_rsa
+*_ed25519
+credentials
+credentials.*
+secrets
+secrets.*
+*secret*
+*token*
+auth.json
+.netrc
+.npmrc
+.pypirc
+
+# Logs and transcripts (may contain prompts)
+*.log
+logs/
+*.jsonl
+history.jsonl
+transcripts/
+
+# Local scratch and caches
+tmp/
+temp/
+.cache/
+*.tmp
+*.bak
+*.orig
+*.swp
+*~
+
+# Language and tool artifacts
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# Graphify output, never committed
+graphify-out/
+
+# macOS and editors
+.DS_Store
+.AppleDouble
+.Spotlight-V100
+.Trashes
+.idea/
+.vscode/
+
+# Never commit a copy of the live configuration
+claude-config-dump/
+settings.local.json
+.claude.json

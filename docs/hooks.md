@@ -50,6 +50,15 @@ long session.
 response-structure ruleset because the flag file `~/.claude/.i-have-adhd-always` exists.
 Deleting that file turns always-on off permanently.
 
+## Status line
+
+Not a hook, but wired the same way: `statusLine` in `~/.claude/settings.json` runs
+`~/.claude/bin/caveman-statusline.sh` on each refresh, which prints the active wording mode as
+a badge. The plugin's own script lives under a version-hashed cache path, so the wrapper globs
+`~/.claude/plugins/cache/caveman/caveman/*/src/hooks/caveman-statusline.sh`, takes the most
+recent match and execs it. If the plugin is removed or an update fails, the wrapper prints
+nothing and exits 0 rather than breaking the status line.
+
 ## PreToolUse hooks
 
 Both are Graphify guards declared in `~/.claude/settings.json` and both call the local CLI

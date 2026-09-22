@@ -14,7 +14,7 @@ Read from the live machine on 2026-09-22. Paths are written with `~` for the hom
 | Router | Decides engine per task | `~/.claude/skills/ai-router/`, `~/.claude/ai-router.json` |
 | Workers | Bounded subprocess calls to other models | `~/.claude/bin/codex-worker.sh`, `~/.claude/bin/gemini-worker.sh` |
 | Classifier | Bounded semantic judgment, inactive | `~/.claude/vendor/jev-code`, `jev` MCP server |
-| Presentation | Response shape and wording | `i-have-adhd` plugin, `caveman` plugin |
+| Presentation | Response shape and wording | `i-have-adhd` plugin, `caveman` plugin, `statusLine` in `settings.json` |
 
 ## Real file map
 
@@ -26,6 +26,7 @@ Read from the live machine on 2026-09-22. Paths are written with `~` for the hom
 ├── ai-router.json                router kill switches
 ├── bin/
 │   ├── ai-status.sh              local availability probe, zero model calls
+│   ├── caveman-statusline.sh     stable wrapper, resolves the plugin script by glob
 │   ├── codex-worker.sh           bounded Codex call, sandboxed
 │   └── gemini-worker.sh          bounded Gemini call through agy, read only
 ├── hooks/

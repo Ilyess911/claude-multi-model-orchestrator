@@ -45,6 +45,7 @@ Recreate three scripts in `~/.claude/bin/`, all `chmod +x`:
 | Script | Must implement |
 |---|---|
 | `ai-status.sh` | local-only availability probe, `--live` and `--json` flags, prints auth mode never keys |
+| `caveman-statusline.sh` | resolve the current plugin statusline script by glob, exit 0 when the plugin is absent |
 | `codex-worker.sh` | `codex exec`, `--ephemeral`, sandbox per mode, `auth_mode = chatgpt` guard, `perl alarm` timeout, exit codes 0/1/2/3/4 |
 | `gemini-worker.sh` | `agy` NDJSON stdin, structured `result` parsing, per-invocation `mktemp`, cleanup trap, API-key guard, outer `perl alarm` at timeout+30 |
 
@@ -75,6 +76,10 @@ must reproduce.
 
 Then `touch ~/.claude/.i-have-adhd-always` for permanent structure mode, and set the caveman
 level once with `/caveman full`.
+
+For the status line badge, write `~/.claude/bin/caveman-statusline.sh` (glob the plugin cache,
+take the newest match, exec it, exit 0 when absent) and point `statusLine` in `settings.json`
+at that wrapper, never at the version-hashed plugin path directly.
 
 ## 6. Skills
 

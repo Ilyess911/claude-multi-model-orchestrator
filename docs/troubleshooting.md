@@ -57,4 +57,4 @@ Rule in all cases: **a worker failing never blocks the task.** Claude finishes i
 |---|---|
 | Wording mode drifts mid-session | the `UserPromptSubmit` tracker re-asserts it; `/caveman lite\|full\|ultra` sets the level |
 | Response structure lost | say "stop adhd mode" to disable for a session, or delete `~/.claude/.i-have-adhd-always` to disable always-on permanently |
-| Statusline badge missing | the caveman statusline is not configured in `settings.json`; optional |
+| Statusline badge missing | check `statusLine` in `settings.json` points at `~/.claude/bin/caveman-statusline.sh`, then run it by hand: it must print a badge and exit 0. An empty result means no plugin copy matched the glob, so reinstall the plugin |

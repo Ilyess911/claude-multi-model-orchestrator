@@ -30,7 +30,8 @@ Read from the live machine on 2026-09-22. Paths are written with `~` for the hom
 │   ├── codex-worker.sh           bounded Codex call, sandboxed
 │   └── gemini-worker.sh          bounded Gemini call through agy, read only
 ├── hooks/
-│   └── graphify_session_start.py SessionStart graph freshness
+│   ├── graphify_session_start.py SessionStart graph freshness
+│   └── session_receipt.py        SessionEnd session receipt, reads the transcript
 ├── skills/
 │   ├── ai-router/                SKILL.md + routing-policy + capabilities + billing-policy
 │   ├── graphify/                 SKILL.md + references/

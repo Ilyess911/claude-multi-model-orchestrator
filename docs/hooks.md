@@ -71,6 +71,44 @@ only. No model call, no network.
 
 They guard, they do not block work: exit status is 0 in the normal case.
 
+## SessionEnd hook: session receipt
+
+`~/.claude/hooks/session_receipt.py`, wired as a `SessionEnd` hook (timeout 10 s). When a
+session closes, it reads the session transcript named in the hook input, plus the subagent
+transcripts under `<session>/subagents/`, and prints a 40-column thermal-receipt summary
+straight to `/dev/tty`. No model call, no network, fails open (exit 0 on any error).
+
+What the receipt shows:
+
+| Line | Source |
+|---|---|
+| Models used | `message.model` of each assistant message, deduplicated by message id |
+| Input, output, cache read, cache write, total | `message.usage` as returned by the API |
+| Tools and skills | `tool_use` blocks; skills are `Skill` calls, counted by skill name |
+| Codex, Gemini | Bash calls that invoke `codex-worker.sh --mode` / `gemini-worker.sh --mode` (or `codex exec`, `agy -`); a `grep` or `cat` on the scripts does not count |
+| Jev | `mcp__jev__*` tool calls |
+| Duration | first to last transcript timestamp |
+| API equivalent | per-model rates, see below |
+| Real billed cost | 0 $ on the subscription login; equal to the API equivalent only if `ANTHROPIC_API_KEY` is set in Claude Code's environment |
+| Extra billing | `OUI` when a metered path was detected: an Anthropic API key, or Jev calls (TypeSafe, metered) |
+
+Two costs, kept apart on purpose:
+
+- **COUT REEL FACTURE**: what this session actually adds to a bill. Claude, Codex and Gemini
+  all run on included subscriptions, so it is 0 $ unless a metered path was detected.
+- **EQUIVALENT API**: what the same Claude token usage would have cost on the Claude API.
+  Rates per model (input, 5 min cache write, 1 h cache write, cache read, output) are
+  hard-coded from the official pricing page, checked on 2026-09-25. Fast mode, `inference_geo:
+  "us"` (x1.1) and web search ($10 per 1,000) are applied when the usage block reports them.
+  An unknown model id is listed as "sans tarif" instead of being guessed.
+
+Codex and Gemini get no API equivalent. `codex-worker.sh` runs `codex exec --ephemeral` with
+stdout discarded and `agy` reports no token usage, so no exact data exists to convert. The
+receipt shows the delegation count and "quota non mesure".
+
+Manual run on any transcript: `python3 ~/.claude/hooks/session_receipt.py <transcript.jsonl>`.
+When prices change, update the `PRICES` table at the top of the script.
+
 ## Per-repository git hooks
 
 Separate from Claude Code. `graphify hook install` writes `post-commit` and `post-checkout`

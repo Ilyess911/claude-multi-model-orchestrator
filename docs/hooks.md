@@ -78,7 +78,8 @@ session closes, it reads the session transcript named in the hook input, plus th
 transcripts under `<session>/subagents/`, and prints a 40-column thermal-receipt summary
 to the terminal device owned by the `claude` process (hooks run without a controlling
 terminal, so `/dev/tty` fails with ENXIO). Fires on `/exit`, Ctrl+D and Ctrl+C, not when the
-terminal window is killed. No model call, no network, fails open (exit 0 on any error).
+terminal window is killed. No model call, fails open (exit 0 on any error). The only network
+call is the optional Telegram copy described below, made after the ticket is printed.
 
 What the receipt shows:
 
@@ -111,6 +112,64 @@ receipt shows the delegation count and "quota non mesure".
 Manual run on any transcript: `python3 ~/.claude/hooks/session_receipt.py <transcript.jsonl>`.
 When prices change, update the `PRICES` table at the top of the script.
 
+### Telegram copy of the receipt
+
+One pipeline, one hook: the same script renders the ticket, then hands a metadata-only copy
+to a dedicated Telegram bot.
+
+```
+SessionEnd
+  -> session_receipt.py
+       summarize(transcript)      counts only, computed once
+       render()                   terminal ticket, always, first
+       telegram_text()            HTML message for the phone
+       telegram_spawn()           detached child, the hook returns at once
+         -> Telegram Bot API sendMessage
+```
+
+What is sent: date and time, duration, models, request count, tokens (input, output, cache,
+total), tool call count, skill names and counts, Codex and Gemini delegation counts, Jev
+calls, API equivalent, real billed cost, first 8 characters of the session id. What is never
+sent: prompts, replies, code, file names, paths, repository content, transcripts, secrets.
+
+The message adapts to the session. A short session (fewer than 15 requests, no skill, no
+worker) gets four lines. A longer one gets a token and cost block, the top three skills, and
+an orchestration block only when Codex, Gemini or Jev actually ran (otherwise one line,
+"Claude only"). HTML parse mode, `<pre>` blocks for aligned numbers, one phone screen at most.
+
+Failure rules, Telegram can never break the ticket:
+
+- The ticket is written before anything Telegram related runs.
+- Sending happens in a detached child (`start_new_session`), so Claude Code closes at once,
+  online or not.
+- 5 s timeout, one retry on a network error only, no retry on an HTTP error (bad token,
+  blocked bot, bad chat id).
+- Errors go to `~/.claude/logs/session-ticket-error.log` as a class or HTTP code only, never
+  the token, the chat id or the message.
+- Token or chat id missing: nothing is sent, nothing is logged.
+- Kill switch: `CLAUDE_TELEGRAM_RECEIPT=0` in the environment.
+
+Credentials live in the macOS Keychain only and are read at send time:
+
+| Keychain service | Content |
+|---|---|
+| `CLAUDE_TELEGRAM_BOT_TOKEN` | bot token from @BotFather |
+| `CLAUDE_TELEGRAM_CHAT_ID` | private chat id of the owner |
+
+Setup:
+
+1. Create the bot with @BotFather (`/newbot`).
+2. Store the token from a separate terminal, masked prompt, nothing in shell history:
+   `security add-generic-password -U -a "$USER" -s CLAUDE_TELEGRAM_BOT_TOKEN -w`
+3. Send `/start` to the bot, then run
+   `python3 ~/.claude/hooks/session_receipt.py --telegram-setup-chat`. It calls `getUpdates`
+   once, keeps only the private chat id and writes it to the Keychain through `security -i`
+   (the value never appears in a process argument list).
+4. Check: `python3 ~/.claude/hooks/session_receipt.py --telegram-test` prints
+   `TELEGRAM: PASS`.
+5. Preview a message without sending:
+   `python3 ~/.claude/hooks/session_receipt.py --telegram-preview <transcript.jsonl>`.
+
 ## Per-repository git hooks
 
 Separate from Claude Code. `graphify hook install` writes `post-commit` and `post-checkout`
@@ -119,6 +178,7 @@ switch. AST only, no model call. Log at `~/.cache/graphify-rebuild.log`.
 
 ## What no hook does
 
-- No hook calls Codex, Gemini, Jev or any API.
+- No hook calls Codex, Gemini, Jev or any model API. The one outbound call is the
+  best-effort Telegram copy of the session receipt, metadata only.
 - No hook writes to a work repository beyond the Graphify output directory.
 - No hook blocks a tool call outright.

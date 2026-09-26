@@ -64,6 +64,8 @@ must reproduce.
   `hook-guard read` on `Read|Glob`.
 - Write `~/.claude/hooks/session_receipt.py` (reads the transcript, prints the session
   receipt to the terminal device of the `claude` process, fails open) and wire it as a `SessionEnd` hook with a 10 s timeout.
+  Optional Telegram copy: create the bot, store token and chat id in the Keychain, see
+  [hooks.md](hooks.md#telegram-copy-of-the-receipt).
   Back up `settings.json` with a timestamp before editing it.
 - Per work repository: `graphify hook install`, and add `graphify-out/` to `.gitignore`.
 

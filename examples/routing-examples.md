@@ -35,6 +35,7 @@ A three line task stays a three line task.
 |---|---|
 | "Refactor the authentication module" | 1. Graphify: dependencies, callers, imports, impact. 2. Verify in source, because the graph misses dynamic dispatch and injected collaborators. 3. Claude implements, or Codex if the spec is crisp and isolatable. 4. Tests. 5. Independent review by a model that did not write it. 6. `graphify update .` if the structure changed. |
 | "What breaks if I delete this module?" | Graphify `explain`, then source verification. No worker. |
+| "Audit `auth.ts` for security flaws" | Claude and Codex `--mode review` read the same files independently, then Claude reconciles. Never fast path, even for two files. |
 | "Analyze this large unfamiliar repository" | 1. Graphify for the map. 2. A targeted Gemini analysis on the parts worth reading in bulk. 3. Claude synthesizes and decides. |
 
 ## Review

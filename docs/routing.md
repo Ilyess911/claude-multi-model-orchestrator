@@ -18,6 +18,8 @@ the invocation details and is loaded once a route other than DIRECT is picked.
 
 Trivial work skips routing entirely, with no worker and no routing note: existence checks,
 git status, a typo, a rename, changing a value, a one-line fix, a short factual answer.
+Never fast path: a security review or audit of risk-area code, even one or two files. That
+is always a cross review with Codex.
 
 ## Hierarchy
 
@@ -35,7 +37,8 @@ IMPLEMENT_REVIEW, PARALLEL_ANALYSIS.
 - **Risk-based review:** auth, permissions, security, billing, payments, migrations,
   destructive operations, deployment, infrastructure, concurrency, data-loss risk, large
   refactors, public releases. Even a small diff there gets a reviewer that did not write it;
-  a request to review such a change sends it to Codex in `--mode review` alongside Claude.
+  a request to review or audit code in a risk area, whether a diff or existing files, sends
+  the same code to Codex in `--mode review` alongside Claude.
 - Repository-wide or cross-package questions default to PARALLEL_ANALYSIS: Gemini reads the
   whole scope while Claude narrows with Graphify or grep; targeted grep is not a repo-wide read.
 - Workers run in the foreground so their result is awaited; a backgrounded worker dies with a

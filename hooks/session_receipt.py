@@ -66,6 +66,34 @@ SHORT = {
 # not a mention: grep, sed or cat on the worker script does not count.
 CODEX_RE = re.compile(r"codex-worker\.sh[\"']?\s+--mode|(?:^|[;&|(]\s*)codex\s+exec\b")
 GEMINI_RE = re.compile(r"gemini-worker\.sh[\"']?\s+--mode|(?:^|[;&|(]\s*)agy\s+-")
+WORKER_MODE_RE = re.compile(r"(codex|gemini)-worker\.sh[\"']?\s+--mode[= ]+[\"']?(\w+)")
+ROUTES = ("DIRECT", "CODEX", "GEMINI", "REVIEW", "PARALLEL")
+
+
+def is_prompt(d):
+    """A turn typed by the person: not a tool result, meta line, command echo or summary."""
+    if d.get("type") != "user" or d.get("isMeta") or d.get("isSidechain") \
+            or d.get("isCompactSummary"):
+        return False
+    c = (d.get("message") or {}).get("content")
+    if isinstance(c, list):
+        if any(isinstance(x, dict) and x.get("type") == "tool_result" for x in c):
+            return False
+        c = " ".join(x.get("text", "") for x in c if isinstance(x, dict))
+    c = (c or "").lstrip()
+    return bool(c) and not c.startswith(("<command-", "<local-command", "<bash-", "Caveat:"))
+
+
+def route_of(calls):
+    """Route of one turn from its worker calls [(worker, mode)], transcript data only."""
+    if not calls:
+        return "DIRECT"
+    if any(m == "review" for _, m in calls):
+        return "REVIEW"
+    ws = {w for w, _ in calls}
+    if ws == {"codex", "gemini"}:
+        return "PARALLEL"
+    return "CODEX" if "codex" in ws else "GEMINI"
 
 
 def price_key(model):
@@ -87,12 +115,16 @@ def load(path):
     msgs, first, last = {}, None, None
     tools, skills = {}, {}
     codex = gemini = jev = 0
-    lines = (l for f in files_for(path) for l in open(f, encoding="utf-8", errors="replace"))
-    for line in lines:
+    turns = []  # worker calls per prompt of the main transcript, for route telemetry
+    lines = ((f == path, l) for f in files_for(path)
+             for l in open(f, encoding="utf-8", errors="replace"))
+    for main, line in lines:
         try:
             d = json.loads(line)
         except ValueError:
             continue
+        if main and is_prompt(d):
+            turns.append([])
         ts = d.get("timestamp")
         if ts:
             first = first or ts
@@ -120,7 +152,12 @@ def load(path):
                 cmd = str(inp.get("command", ""))
                 codex += len(CODEX_RE.findall(cmd))
                 gemini += len(GEMINI_RE.findall(cmd))
-    return list(msgs.values()), first, last, tools, skills, codex, gemini, jev
+                if turns:
+                    turns[-1] += WORKER_MODE_RE.findall(cmd)
+    routes = dict.fromkeys(ROUTES, 0)
+    for t in turns:
+        routes[route_of(t)] += 1
+    return list(msgs.values()), first, last, tools, skills, codex, gemini, jev, routes
 
 
 def cost(m):
@@ -176,7 +213,7 @@ def summarize(path):
 
     Counts and names of models, tools and skills only: no prompt, reply, path or code.
     """
-    msgs, first, last, tools, skills, codex, gemini, jev = load(path)
+    msgs, first, last, tools, skills, codex, gemini, jev, routes = load(path)
     models = {}
     tin = tout = cr = cw = 0
     equiv, unpriced = 0.0, set()
@@ -214,7 +251,11 @@ def summarize(path):
     return {"models": models, "tin": tin, "tout": tout, "cr": cr, "cw": cw,
             "equiv": equiv, "unpriced": unpriced, "dur": dur, "metered": metered,
             "real": real, "secs": secs, "tool_counts": tool_counts, "skills": skills,
-            "codex": codex, "gemini": gemini, "jev": jev}
+            "codex": codex, "gemini": gemini, "jev": jev, "routes": routes}
+
+
+ROUTE_LABELS = (("DIRECT", "DIRECT"), ("CODEX", "CODEX"), ("GEMINI", "GEMINI"),
+                ("REVIEW", "CROSS REVIEW"), ("PARALLEL", "PARALLEL"))
 
 
 def render(path, session_id="", reason="", st=None):
@@ -244,6 +285,11 @@ def render(path, session_id="", reason="", st=None):
           row("Jev", f"{jev} appels" if jev else "0")]
     if codex or gemini:
         L.append(row("  quota Codex/Gemini", "non mesure"))
+    routes = st.get("routes") or {}
+    if any(routes.values()):
+        L += [sep, "ROUTING"]
+        for k, label in ROUTE_LABELS:
+            L.append(row("  " + label, routes.get(k, 0)))
     L += [sep, row("Duree", dur), sep,
           row("EQUIVALENT API", f"{equiv:.2f} $"),
           row("COUT REEL FACTURE", f"{real:.2f} $"),
@@ -367,6 +413,10 @@ def telegram_text(st, session_id=""):
             L += ["", "<b>🧭 Orchestration</b>", "<pre>" + e("\n".join(orch)) + "</pre>"]
         else:
             L.append("🧭 Claude only")
+        routes = st.get("routes") or {}
+        if any(routes.values()):
+            rl = [f"{label:<13}{routes.get(k, 0):>3}" for k, label in ROUTE_LABELS]
+            L += ["", "<b>🔀 Routing</b>", "<pre>" + e("\n".join(rl)) + "</pre>"]
     L.append("")
     if extra:
         L.append("🟠 Coût supplémentaire : " + e(" · ".join(extra)))

@@ -357,6 +357,14 @@ def layout(st, sid, when):
         t.lead(label, str(n), bold=bool(n), tone=1.0 if n else 0.72)
     if not workers:
         t.text("CLAUDE ONLY SESSION", 0.8, tone=0.75, align="center")
+    routes = st.get("routes") or {}
+    if any(routes.values()):
+        t.rule(".")
+        t.text("DECISIONS", bold=True)
+        for key, label in (("DIRECT", "DIRECT"), ("CODEX", "CODEX"), ("GEMINI", "GEMINI"),
+                           ("REVIEW", "CROSS REVIEW"), ("PARALLEL", "PARALLEL")):
+            n = routes.get(key, 0)
+            t.lead(label, str(n), bold=bool(n) and key != "DIRECT", tone=1.0 if n else 0.72)
     t.rule("-")
     t.lead("DURATION", duration(st.get("secs")))
     t.rule("=")

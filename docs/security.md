@@ -20,6 +20,7 @@
 | Google account for `agy` | macOS Keychain, shared with the Antigravity desktop app | no API key anywhere |
 | ChatGPT login for Codex | `~/.codex/auth.json`, managed by the CLI | never copied, never printed |
 | GitHub token | `gh` keyring | never echoed into a file |
+| Telegram bot token and chat id | macOS Keychain (`CLAUDE_TELEGRAM_BOT_TOKEN`, `CLAUDE_TELEGRAM_CHAT_ID`), read at send time | not in `settings.json`, a dotfile, a script, a log or a repository |
 
 Status output prints auth **mode**, never key material.
 
@@ -31,6 +32,7 @@ Status output prints auth **mode**, never key material.
 | Codex worker | ChatGPT subscription endpoint, only the scoped prompt |
 | Gemini worker | Google endpoint through `agy`, only the scoped prompt |
 | Jev | TypeSafe API, inactive today |
+| Session receipt, Telegram copy | Telegram Bot API, session metadata only (counts, models, costs, short session id), never prompts, replies, code or paths |
 | Graphify LLM-backed subcommands (`extract`, `label`, `cluster-only` without `--no-label`, `add <url>`, `prs --triage`, the semantic pass of the `/graphify` skill) | can send file content off-machine, so each one needs explicit approval per repository |
 
 Hard rule: no employer-owned or confidential material is ever fed into an LLM-backed path.

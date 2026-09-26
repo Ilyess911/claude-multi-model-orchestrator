@@ -63,7 +63,7 @@ must reproduce.
 - Wire the two Graphify `PreToolUse` guards: `hook-guard search` on `Bash|Grep`,
   `hook-guard read` on `Read|Glob`.
 - Write `~/.claude/hooks/session_receipt.py` (reads the transcript, prints the session
-  receipt to `/dev/tty`, fails open) and wire it as a `SessionEnd` hook with a 10 s timeout.
+  receipt to the terminal device of the `claude` process, fails open) and wire it as a `SessionEnd` hook with a 10 s timeout.
   Back up `settings.json` with a timestamp before editing it.
 - Per work repository: `graphify hook install`, and add `graphify-out/` to `.gitignore`.
 

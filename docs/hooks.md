@@ -76,7 +76,9 @@ They guard, they do not block work: exit status is 0 in the normal case.
 `~/.claude/hooks/session_receipt.py`, wired as a `SessionEnd` hook (timeout 10 s). When a
 session closes, it reads the session transcript named in the hook input, plus the subagent
 transcripts under `<session>/subagents/`, and prints a 40-column thermal-receipt summary
-straight to `/dev/tty`. No model call, no network, fails open (exit 0 on any error).
+to the terminal device owned by the `claude` process (hooks run without a controlling
+terminal, so `/dev/tty` fails with ENXIO). Fires on `/exit`, Ctrl+D and Ctrl+C, not when the
+terminal window is killed. No model call, no network, fails open (exit 0 on any error).
 
 What the receipt shows:
 

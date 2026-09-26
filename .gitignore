@@ -62,3 +62,8 @@ graphify-out/
 claude-config-dump/
 settings.local.json
 .claude.json
+
+# Generated session receipts, never committed
+receipts/
+*.receipt.png
+test-receipt-*.png

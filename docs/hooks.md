@@ -122,10 +122,39 @@ SessionEnd
   -> session_receipt.py
        summarize(transcript)      counts only, computed once
        render()                   terminal ticket, always, first
-       telegram_text()            HTML message for the phone
+       telegram_payload()         metrics + fallback text, JSON
        telegram_spawn()           detached child, the hook returns at once
-         -> Telegram Bot API sendMessage
+         -> receipt_png.render_png()   thermal receipt PNG, Pillow
+         -> Telegram Bot API sendPhoto, caption "Claude Orchestrator · Session complete"
+         -> sendMessage (HTML text) if the PNG cannot be rendered or the photo is refused
 ```
+
+Source files are versioned in [`hooks/`](../hooks/). The transcript is parsed once; the
+terminal ticket, the PNG and the text message all read the same metrics dict.
+
+#### Thermal receipt PNG
+
+`receipt_png.py` draws a vertical receipt about 830 px wide, height following the content:
+off-white paper with a light seeded grain, torn top and bottom edges, a dark backdrop (Telegram
+converts photos, so no transparency), Menlo from macOS (fallbacks SF Mono, Courier New,
+Courier, Pillow default), black ink with a slight bleed. Sections: header, date and short
+session id, models, tokens, activity (top 3 tools and top 3 skills), an ORCHESTRATION block
+only when Codex, Gemini or Jev ran, session time, costs, footer. "API EQUIVALENT" is grey and
+marked "reference only, not billed"; "ACTUALLY BILLED" is the large boxed total. The barcode
+is a real Code128 of the 8-character short id (python-barcode), with a deterministic
+decorative fallback. Local, deterministic, no network, around 150 to 350 ms. The PNG is kept
+in memory and never written to disk by the hook.
+
+Pillow lives in a dedicated venv used only by the detached child, so the terminal ticket keeps
+zero dependencies:
+
+```
+uv venv ~/.claude/venvs/session-receipt --python /opt/homebrew/bin/python3
+uv pip install --python ~/.claude/venvs/session-receipt/bin/python pillow python-barcode
+```
+
+Without the venv the child runs on the hook's Python, the import fails and the text message is
+sent instead. `CLAUDE_TELEGRAM_PHOTO=0` forces the text message.
 
 What is sent: date and time, duration, models, request count, tokens (input, output, cache,
 total), tool call count, skill names and counts, Codex and Gemini delegation counts, Jev
@@ -138,6 +167,9 @@ an orchestration block only when Codex, Gemini or Jev actually ran (otherwise on
 "Claude only"). HTML parse mode, `<pre>` blocks for aligned numbers, one phone screen at most.
 
 Failure rules, Telegram can never break the ticket:
+
+- PNG fails: text message. Telegram fails: the ticket is already printed. Everything fails:
+  Claude Code still exits normally.
 
 - The ticket is written before anything Telegram related runs.
 - Sending happens in a detached child (`start_new_session`), so Claude Code closes at once,
@@ -167,8 +199,9 @@ Setup:
    (the value never appears in a process argument list).
 4. Check: `python3 ~/.claude/hooks/session_receipt.py --telegram-test` prints
    `TELEGRAM: PASS`.
-5. Preview a message without sending:
-   `python3 ~/.claude/hooks/session_receipt.py --telegram-preview <transcript.jsonl>`.
+5. Preview without sending: `--telegram-preview <transcript.jsonl>` prints the text message;
+   `~/.claude/venvs/session-receipt/bin/python ~/.claude/hooks/session_receipt.py
+   --png-preview <transcript.jsonl> <out.png>` writes the PNG.
 
 ## Per-repository git hooks
 

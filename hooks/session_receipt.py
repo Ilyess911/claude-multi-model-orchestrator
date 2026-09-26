@@ -160,7 +160,8 @@ def load(path):
     return list(msgs.values()), first, last, tools, skills, codex, gemini, jev, routes
 
 
-def cost(m):
+def cost_parts(m):
+    """API-equivalent USD per line item: input, cache write, cache read, output, extras."""
     u = m.get("usage") or {}
     k = price_key(m.get("model"))
     if not k:
@@ -174,12 +175,18 @@ def cost(m):
     c1 = cc.get("ephemeral_1h_input_tokens")
     if c5 is None and c1 is None:
         c5, c1 = u.get("cache_creation_input_tokens", 0), 0
-    usd = (u.get("input_tokens", 0) * inp + (c5 or 0) * w5 + (c1 or 0) * w1
-           + u.get("cache_read_input_tokens", 0) * rd + u.get("output_tokens", 0) * out) / 1e6
-    if u.get("inference_geo") == "us":
-        usd *= 1.1
+    geo = 1.1 if u.get("inference_geo") == "us" else 1.0
     ws = (u.get("server_tool_use") or {}).get("web_search_requests", 0)
-    return usd + ws * 0.01
+    return {"in": u.get("input_tokens", 0) * inp / 1e6 * geo,
+            "cw": ((c5 or 0) * w5 + (c1 or 0) * w1) / 1e6 * geo,
+            "cr": u.get("cache_read_input_tokens", 0) * rd / 1e6 * geo,
+            "out": u.get("output_tokens", 0) * out / 1e6 * geo,
+            "web": ws * 0.01}
+
+
+def cost(m):
+    p = cost_parts(m)
+    return None if p is None else sum(p.values())
 
 
 def fmt_n(n):
@@ -214,7 +221,7 @@ def summarize(path):
     Counts and names of models, tools and skills only: no prompt, reply, path or code.
     """
     msgs, first, last, tools, skills, codex, gemini, jev, routes = load(path)
-    models = {}
+    models, bill = {}, {}
     tin = tout = cr = cw = 0
     equiv, unpriced = 0.0, set()
     for m in msgs:
@@ -225,11 +232,18 @@ def summarize(path):
         tout += u.get("output_tokens", 0)
         cr += u.get("cache_read_input_tokens", 0)
         cw += u.get("cache_creation_input_tokens", 0)
-        c = cost(m)
-        if c is None:
+        b = bill.setdefault(k, {f: [0, 0.0] for f in ("in", "cw", "cr", "out", "web")})
+        for f, n in (("in", u.get("input_tokens", 0)), ("cw", u.get("cache_creation_input_tokens", 0)),
+                     ("cr", u.get("cache_read_input_tokens", 0)), ("out", u.get("output_tokens", 0)),
+                     ("web", (u.get("server_tool_use") or {}).get("web_search_requests", 0))):
+            b[f][0] += n
+        p = cost_parts(m)
+        if p is None:
             unpriced.add(m["model"])
         else:
-            equiv += c
+            equiv += sum(p.values())
+            for f, v in p.items():
+                b[f][1] += v
 
     dur, secs = "", None
     try:
@@ -251,7 +265,7 @@ def summarize(path):
     return {"models": models, "tin": tin, "tout": tout, "cr": cr, "cw": cw,
             "equiv": equiv, "unpriced": unpriced, "dur": dur, "metered": metered,
             "real": real, "secs": secs, "tool_counts": tool_counts, "skills": skills,
-            "codex": codex, "gemini": gemini, "jev": jev, "routes": routes}
+            "codex": codex, "gemini": gemini, "jev": jev, "routes": routes, "bill": bill}
 
 
 ROUTE_LABELS = (("DIRECT", "DIRECT"), ("CODEX", "CODEX"), ("GEMINI", "GEMINI"),

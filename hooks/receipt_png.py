@@ -23,6 +23,8 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 PAPER_RGB = np.array([247, 244, 236], np.float32)   # thermal paper, faintly warm
 BACK_RGB = np.array([234, 231, 223], np.float32)    # reverse side, seen on a folded corner
 INK_RGB = np.array([36, 35, 33], np.float32)        # softened black
+RED_RGB = np.array([176, 38, 42], np.float32)       # second head of a two-colour kitchen printer
+STAMP_RGB = np.array([150, 30, 70], np.float32)     # rubber stamp, violet-red pad ink
 BACKDROP = (198, 196, 191)                         # neutral desk grey; Telegram flattens alpha to white
 
 SIZE = 26              # body size in px, Andale Mono advance 16 px
@@ -90,13 +92,13 @@ class Tape:
         self.cols = {k: int((PAPER_W - 2 * PAD_X) // a) for k, a in self.adv.items()}
         self.lines = []
 
-    def text(self, s, scale=1, bold=False, tone=1.0, align="left", key=False):
+    def text(self, s, scale=1, bold=False, tone=1.0, align="left", key=False, red=False, tag=None):
         c = self.cols[scale]
         s = s[:c]
         s = s.center(c).rstrip() if align == "center" else s
-        self.lines.append(("text", s, scale, bold, tone, key))
+        self.lines.append(("text", s, scale, bold, tone, key, red, tag))
 
-    def lead(self, label, value, bold=False, tone=1.0, indent=0, key=True):
+    def lead(self, label, value, bold=False, tone=1.0, indent=0, key=True, red=False):
         """LABEL ........ VALUE, the dotted leader of old register slips."""
         c = self.cols[1]
         label = " " * indent + label
@@ -104,12 +106,25 @@ class Tape:
         if dots < 2:
             label = label[: c - len(value) - 4]
             dots = c - len(label) - len(value) - 2
-        self.text(f"{label} {'.' * dots} {value}", 1, bold, tone, key=key)
+        self.text(f"{label} {'.' * dots} {value}", 1, bold, tone, key=key, red=red)
+
+    def split(self, left, right, scale=1, **kw):
+        c = self.cols[scale]
+        self.text(left + " " * max(1, c - len(left) - len(right)) + right, scale, **kw)
+
+    def item(self, qty, name, price, tone=1.0, bold=False):
+        """QTY  DESIGNATION            PRICE, the column layout of a restaurant bill."""
+        c = self.cols[1]
+        room = c - 7 - len(price) - 1
+        self.text(f"{qty:>5}  {name[:room]:<{room}} {price}", tone=tone, bold=bold, key=True)
+
+    def logo(self):
+        self.lines.append(("logo",))
 
     def rule(self, ch="-"):
         c = self.cols[1]
         s = (". " * c)[:c] if ch == "." else ch * c
-        self.lines.append(("text", s, 1, False, 0.8 if ch in ".-" else 1.0, False))
+        self.lines.append(("text", s, 1, False, 0.8 if ch in ".-" else 1.0, False, False, None))
 
     def gap(self, px):
         self.lines.append(("gap", px))
@@ -122,26 +137,40 @@ class Tape:
             return line[1]
         if line[0] == "barcode":
             return 104
+        if line[0] == "logo":
+            return 92
         return int(self.font[line[2]].size * 1.42)
 
     def print_ink(self, rng):
-        """Ink coverage (0..1), per-row head pressure, and rows holding key figures."""
+        """Black and red ink coverage (0..1), per-row head pressure, key rows, tagged rows."""
         h = PAD_TOP + sum(self.height(l) for l in self.lines) + PAD_BOTTOM
         ink = Image.new("L", (PAPER_W, h), 0)
-        d = ImageDraw.Draw(ink)
+        red = Image.new("L", (PAPER_W, h), 0)
+        dk, dr = ImageDraw.Draw(ink), ImageDraw.Draw(red)
         dens = np.ones(h, np.float32)
         keep = np.zeros(h, bool)
+        tags = {}
         y = PAD_TOP
         for line in self.lines:
             lh = self.height(line)
             if line[0] == "text":
-                _, s, scale, bold, tone, key = line
+                _, s, scale, bold, tone, key, is_red, tag = line
                 lo = 0.93 if key or bold else 0.84      # key figures stay near full density
                 dens[y:y + lh] = tone * rng.uniform(lo, 1.0)
                 stroke = (2 if scale == 2 else 1) if bold else 0
-                d.text((PAD_X, y), s, font=self.font[scale], fill=255, stroke_width=stroke, stroke_fill=255)
+                (dr if is_red else dk).text((PAD_X, y), s, font=self.font[scale], fill=255,
+                                            stroke_width=stroke, stroke_fill=255)
                 if key or bold:
                     keep[y:y + lh] = True
+                if tag:
+                    tags[tag] = y + lh // 2
+            elif line[0] == "logo":                     # serving cloche, printed in red
+                cx, base = PAPER_W // 2, y + 70
+                dr.pieslice((cx - 52, base - 52, cx + 52, base + 52), 180, 360, outline=255, width=5)
+                dr.ellipse((cx - 8, base - 66, cx + 8, base - 50), fill=255)
+                dr.rounded_rectangle((cx - 70, base + 2, cx + 70, base + 9), 3, fill=255)
+                dr.arc((cx - 36, base - 38, cx + 20, base + 20), 200, 250, fill=255, width=4)
+                keep[y:y + lh] = True
             elif line[0] == "barcode":
                 mods = line[1]
                 mw = max(3, int((PAPER_W - 2 * PAD_X - 20) / len(mods)))
@@ -149,9 +178,10 @@ class Tape:
                 for i, m in enumerate(mods):
                     if m == "1":
                         v = int(255 * rng.uniform(0.86, 1.0))
-                        d.rectangle((x0 + i * mw, y, x0 + (i + 1) * mw - 1, y + 84), fill=v)
+                        dk.rectangle((x0 + i * mw, y, x0 + (i + 1) * mw - 1, y + 84), fill=v)
             y += lh
-        return np.asarray(ink, np.float32) / 255.0, dens, keep
+        f = lambda im: np.asarray(im, np.float32) / 255.0
+        return f(ink), f(red), dens, keep, tags
 
 
 # --- 2. Paper, ink and thermal defects ------------------------------------------------------
@@ -267,7 +297,58 @@ def light_field(h, w, rng):
         n = (xx - cx) * math.sin(ang) - (yy - cy) * math.cos(ang)
         t = (xx - cx) * math.cos(ang) + (yy - cy) * math.sin(ang)
         f += fold_profile(n, 12, 0.06) * np.exp(-(t / rng.uniform(110, 190)) ** 2)
-    return np.clip(f, 0.86, 1.04), folds
+    f += crumple(h, w, rng)
+    return np.clip(f, 0.80, 1.06), folds
+
+
+def crumple(h, w, rng):
+    """Balled up then flattened: Voronoi facets, each a slightly tilted plane under raking
+    light, so every facet border reads as a soft crease, plus a few sharp short creases."""
+    n = int(rng.integers(26, 40))
+    pts = np.stack([rng.uniform(-0.05, 1.05, n) * w, rng.uniform(-0.02, 1.02, n) * h], 1)
+    s = 4                                                   # facets solved on a coarse grid
+    yy, xx = np.mgrid[0:h:s, 0:w:s].astype(np.float32)
+    d = (xx[..., None] - pts[:, 0]) ** 2 + (yy[..., None] - pts[:, 1]) ** 2
+    idx = np.argmin(d, -1)
+    gx, gy = rng.normal(0, 0.00026, n), rng.normal(0, 0.00016, n)
+    plane = gx[idx] * (xx - pts[idx, 0]) + gy[idx] * (yy - pts[idx, 1]) + rng.normal(0, 0.022, n)[idx]
+    img = Image.fromarray(((np.clip(plane, -0.1, 0.1) + 0.1) * 1275).astype(np.uint8))
+    img = img.resize((w, h), Image.BILINEAR).filter(ImageFilter.GaussianBlur(2.2))
+    f = np.asarray(img, np.float32) / 1275 - 0.1
+    Y, X = np.mgrid[0:h, 0:w].astype(np.float32)
+    for _ in range(rng.integers(9, 15)):                    # short sharp creases
+        ang = rng.uniform(0, math.pi)
+        cx, cy = rng.uniform(0.05, 0.95) * w, rng.uniform(0.03, 0.97) * h
+        nrm = (X - cx) * math.sin(ang) - (Y - cy) * math.cos(ang)
+        tan = (X - cx) * math.cos(ang) + (Y - cy) * math.sin(ang)
+        f += fold_profile(nrm, rng.uniform(5, 12), rng.uniform(0.045, 0.085)) \
+            * np.exp(-(tan / rng.uniform(60, 220)) ** 2)
+    return f
+
+
+def rubber_stamp(h, w, cy, rng, top="PAYÉ", bottom="ABONNEMENT CLAUDE MAX"):
+    """Rubber stamp coverage, inked unevenly and pressed at a slant near row cy."""
+    big, small = load_font(88), load_font(22)
+    sw, sh = 440, 190
+    im = Image.new("L", (sw, sh), 0)
+    d = ImageDraw.Draw(im)
+    d.rounded_rectangle((6, 6, sw - 7, sh - 7), 16, outline=255, width=7)
+    d.rounded_rectangle((20, 20, sw - 21, sh - 21), 10, outline=255, width=3)
+    d.text((sw / 2, 88), top, font=big, fill=255, anchor="mm", stroke_width=2, stroke_fill=255)
+    d.text((sw / 2, 150), bottom, font=small, fill=255, anchor="mm")
+    im = im.rotate(rng.uniform(8, 15) * (1 if rng.random() < 0.5 else -1), Image.BICUBIC, expand=True)
+    a = np.asarray(im, np.float32) / 255.0
+    ih, iw = a.shape
+    press = 0.62 + smooth_noise(rng, ih, iw, 60, 0.3) + smooth_noise(rng, ih, iw, 8, 0.2)
+    a = a * np.clip(press, 0, 1) * (rng.random((ih, iw)) > 0.06)       # dry patches, pinholes
+    a = np.asarray(Image.fromarray((a * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.8)),
+                   np.float32) / 255.0
+    out = np.zeros((h, w), np.float32)
+    x0 = int(w * rng.uniform(0.60, 0.70) - iw / 2)
+    y0 = int(cy + rng.uniform(60, 110) - ih / 2)
+    ys, xs = slice(max(0, y0), min(h, y0 + ih)), slice(max(0, x0), min(w, x0 + iw))
+    out[ys, xs] = a[ys.start - y0:ys.stop - y0, xs.start - x0:xs.stop - x0]
+    return out * 0.82
 
 
 # --- 5. Geometry: tilt, bow, keystone, crease pinch -------------------------------------------
@@ -299,108 +380,122 @@ def warp(rgba, folds, rng):
     x = x * (1 + keystone * (yn - 0.5)) - bow * np.sin(math.pi * yn)
     for yf, b in folds:
         y = y - b * np.tanh((y + h / 2 - yf) / 6.0)
+    x = x + smooth_noise(rng, H, W, 140, 1.6)                                # crumple relief
+    y = y + smooth_noise(rng, H, W, 140, 1.2)
     return sample(rgba, x + w / 2, y + h / 2)
 
 
 # --- 6. Content ----------------------------------------------------------------------------
 
+def compact(n):
+    for div, unit in ((1e9, "G"), (1e6, "M"), (1e3, "K")):
+        if n >= div:
+            v = n / div
+            return f"{v:.1f}{unit}" if v < 100 else f"{v:.0f}{unit}"
+    return str(n)
+
+
+def usd(v):
+    return f"{v:.2f}"
+
+
+def short_tool(name):
+    if name.startswith("mcp__"):
+        parts = name.split("__")
+        return (parts[1].replace("claude_ai_", "") + ":" + parts[-1]) if len(parts) > 2 else parts[-1]
+    return name
+
+
+def section(t, title):
+    t.gap(6)
+    t.text(title, bold=True, red=True)
+
+
 def layout(st, sid, when):
+    """A restaurant bill: every model, token line, tool, skill and worker gets its own row."""
     t = Tape()
-    c = t.cols[1]
+    t.logo()
+    t.text("CHEZ CLAUDE", 2, bold=True, align="center")
+    t.text("BISTROT COMPUTATIONNEL  *  DEPUIS 2026", 0.8, tone=0.85, align="center")
+    t.text("1 RUE DU TERMINAL  -  75000 LOCALHOST", 0.8, tone=0.7, align="center")
+    t.gap(8)
     t.rule("=")
-    t.gap(10)
-    t.text("CLAUDE SYSTEMS", 0.8, tone=0.8, align="center")
-    t.gap(4)
-    t.text("CLAUDE", 2, bold=True, align="center")
-    t.text("ORCHESTRATOR", 2, bold=True, align="center")
-    t.text("TERMINAL 01 * SESSION RECEIPT", 0.8, tone=0.85, align="center")
-    t.gap(10)
+    reqs = sum(st["models"].values())
+    t.split("TABLE 01", f"COUVERTS {len(st['models']) or 1}")
+    t.split("SERVEUR  CLAUDE", f"CAISSE {'ROUTER' if st.get('routes') else 'MAIN'}", tone=0.85)
+    t.split(when.strftime("%d/%m/%Y  %H:%M"), f"N° {sid}", tone=0.85)
     t.rule("=")
-    t.lead("SYS", "ONLINE", key=False)
-    t.lead("ROUTER", "ACTIVE", key=False)
-    date, clock = when.strftime("%d %b %Y").upper(), when.strftime("%H:%M")
-    t.text(date + " " * (c - len(date) - len(clock)) + clock)
-    t.lead("SESSION", sid)
+    t.split("QTE  DÉSIGNATION", "PRIX $", tone=0.75)
     t.rule("-")
 
-    t.text("MODEL" + " " * (c - 8) + "REQ", tone=0.75)
-    for k, n in sorted(st["models"].items(), key=lambda x: -x[1])[:3] or [("NONE", 0)]:
-        t.lead(SHORT.get(k, k.upper())[:24], str(n), bold=True)
-    t.rule("-")
+    bill = st.get("bill") or {}
+    for model in sorted(bill, key=lambda k: -sum(v[1] for v in bill[k].values())):
+        b = bill[model]
+        section(t, f"MENU {SHORT.get(model, model.upper())[:18]}  x{st['models'].get(model, 0)} REQ")
+        for key, label in (("in", "Entrée, prompt brut"), ("cr", "Contexte réchauffé"),
+                           ("cw", "Contexte mis en cache"), ("out", "Plat, tokens générés"),
+                           ("web", "Recherche web")):
+            n, v = b.get(key, (0, 0.0))
+            if n or key in ("in", "out"):
+                t.item(compact(n), label, usd(v), bold=key == "out")
+    if not bill:
+        section(t, "MENU")
+        t.item("0", "Aucune requête", "0.00", tone=0.7)
 
-    tin, tout, cr, cw = st["tin"], st["tout"], st["cr"], st["cw"]
-    t.text("TOKENS", bold=True)
-    t.lead("INPUT", num(tin))
-    t.lead("OUTPUT", num(tout))
-    t.lead("CACHE READ", num(cr))
-    t.lead("CACHE WRITE", num(cw))
-    t.rule(".")
-    t.lead("TOTAL TOKENS", num(tin + tout + cr + cw), bold=True)
-    t.rule("-")
+    tools = sorted(st["tool_counts"].items(), key=lambda x: -x[1])
+    section(t, f"LA CUISINE  *  OUTILS ({num(sum(n for _, n in tools))})")
+    for name, n in tools[:9]:
+        t.item(str(n), short_tool(name), "incl.", tone=0.85)
+    if len(tools) > 9:
+        t.item(str(sum(n for _, n in tools[9:])), f"Autres outils ({len(tools) - 9})", "incl.", tone=0.72)
+    if not tools:
+        t.item("0", "Rien en cuisine", "-", tone=0.7)
 
-    tools, skills = st["tool_counts"], st["skills"]
-    t.text("ACTIVITY", bold=True)
-    t.lead("TOOLS", num(sum(tools.values())))
-    for name, n in sorted(tools.items(), key=lambda x: -x[1])[:3]:
-        label = name.split("__")[-1] if name.startswith("mcp__") else name
-        t.lead(label.upper()[:22], f"x{n}", tone=0.72, indent=2, key=False)
-    t.lead("SKILLS", num(sum(skills.values())))
-    for name, n in sorted(skills.items(), key=lambda x: -x[1])[:3]:
-        t.lead(name.split(":")[-1].upper()[:22], f"x{n}", tone=0.72, indent=2, key=False)
-    t.rule("-")
+    skills = sorted(st["skills"].items(), key=lambda x: -x[1])
+    section(t, f"SPÉCIALITÉS DU CHEF  *  SKILLS ({num(sum(n for _, n in skills))})")
+    for name, n in skills[:8]:
+        t.item(str(n), name.split(":")[-1], "offert", tone=0.85)
+    if len(skills) > 8:
+        t.item(str(sum(n for _, n in skills[8:])), f"Autres skills ({len(skills) - 8})", "offert", tone=0.72)
+    if not skills:
+        t.item("0", "Pas de spécialité ce soir", "-", tone=0.7)
 
-    workers = st["codex"] or st["gemini"] or st["jev"]
-    t.text("ROUTING", bold=True)
-    t.lead("CLAUDE", "MAIN")
-    for label, key in (("CODEX", "codex"), ("GEMINI", "gemini"), ("JEV", "jev")):
+    section(t, "LA BRIGADE  *  WORKERS")
+    t.item("1", "Claude, chef de cuisine", "abo", tone=0.85)
+    for label, key, tail in (("Codex, second", "codex", "abo"), ("Gemini, sous-chef", "gemini", "abo"),
+                             ("Jev, commis", "jev", "API")):
         n = st[key]
-        t.lead(label, str(n), bold=bool(n), tone=1.0 if n else 0.72)
-    if not workers:
-        t.text("CLAUDE ONLY SESSION", 0.8, tone=0.75, align="center")
+        t.item(str(n), label, tail if n else "-", tone=1.0 if n else 0.7, bold=bool(n))
     routes = st.get("routes") or {}
     if any(routes.values()):
-        t.rule(".")
-        t.text("DECISIONS", bold=True)
-        for key, label in (("DIRECT", "DIRECT"), ("CODEX", "CODEX"), ("GEMINI", "GEMINI"),
-                           ("REVIEW", "CROSS REVIEW"), ("PARALLEL", "PARALLEL")):
-            n = routes.get(key, 0)
-            t.lead(label, str(n), bold=bool(n) and key != "DIRECT", tone=1.0 if n else 0.72)
-    t.rule("-")
-    t.lead("DURATION", duration(st.get("secs")))
-    t.rule("=")
+        r = [f"{lab} {routes.get(k, 0)}" for k, lab in (("DIRECT", "DIR"), ("CODEX", "CDX"),
+             ("GEMINI", "GEM"), ("REVIEW", "REV"), ("PARALLEL", "PAR"))]
+        t.text("  ROUTES  " + " ".join(r), 0.8, tone=0.8)
 
-    extra = (["ANTHROPIC API"] if st["metered"] else []) + ([f"JEV x{st['jev']}"] if st["jev"] else [])
-    t.text("BILLING", bold=True)
-    t.lead("SUBTOTAL / API EQUIV", f"${st['equiv']:.2f}", tone=0.72)
-    t.text("  * REFERENCE VALUE ONLY, NEVER CHARGED", 0.8, tone=0.7)
-    t.lead("ACTUALLY CHARGED", f"${st['real']:.2f}")
-    t.rule(".")
-    total, label, big = f"${st['real']:.2f}", "TOTAL CHARGED", t.cols[2]
-    if len(label) + len(total) + 1 <= big:
-        t.gap(4)
-        t.text(label + " " * (big - len(label) - len(total)) + total, 2, bold=True)
-    else:
-        t.lead(label, total, bold=True)
-    t.rule("=")
-    t.lead("PLAN", "API KEY" if st["metered"] else "CLAUDE MAX")
-    t.lead("STATUS", "OK")
-    t.gap(6)
-    t.text("** EXTRA: " + ", ".join(extra) + " **" if extra else "** NO ADDITIONAL CHARGE **",
-           bold=True, align="center")
     t.gap(6)
     t.rule("-")
-    t.gap(10)
-    t.text("SESSION CLOSED SUCCESSFULLY", tone=0.9, align="center")
-    t.gap(14)
-    t.text("THANK YOU FOR", bold=True, align="center")
-    t.text("COMPUTING", bold=True, align="center")
+    t.lead("SOUS-TOTAL (TARIF API)", f"${st['equiv']:.2f}")
+    remise = st["equiv"] - st["real"]
+    if remise > 0.004:
+        t.lead("REMISE ABONNEMENT MAX", f"-${remise:.2f}", red=True)
+    t.lead("SERVICE", "COMPRIS", tone=0.8, key=False)
+    t.lead("DURÉE DU SERVICE", duration(st.get("secs")), tone=0.8, key=False)
+    t.rule("=")
     t.gap(4)
-    t.text("CLAUDE SYSTEMS  *  EST. 2026", 0.8, tone=0.8, align="center")
-    t.gap(22)
+    total, label, big = f"${st['real']:.2f}", "TOTAL", t.cols[2]
+    t.text(label + " " * (big - len(label) - len(total)) + total, 2, bold=True, tag="total")
+    t.rule("=")
+    t.split("RÈGLEMENT", "API KEY" if st["metered"] else "ABONNEMENT MAX", tone=0.9)
+    extra = (["API ANTHROPIC"] if st["metered"] else []) + ([f"JEV x{st['jev']}"] if st["jev"] else [])
+    t.gap(4)
+    t.text("SUPPLÉMENT : " + ", ".join(extra) if extra else "AUCUN SUPPLÉMENT FACTURÉ",
+           bold=True, align="center", red=bool(extra))
+    t.gap(14)
+    t.text("MERCI DE VOTRE VISITE", bold=True, align="center")
+    t.text("À BIENTÔT DANS LE TERMINAL", 0.8, tone=0.8, align="center")
+    t.gap(14)
     t.barcode(sid)
     t.text(" ".join(sid), tone=0.95, align="center")
-    t.gap(12)
-    t.text("HUMAN OPERATED  ·  MACHINE ASSISTED", 0.8, tone=0.6, align="center")
     return t
 
 
@@ -411,10 +506,16 @@ def build(st, session_id="", when=None):
     rng = np.random.default_rng(zlib.crc32(sid.encode()))
     when = when or datetime.now()
 
-    ink, dens, keep = layout(st, sid, when).print_ink(rng)
+    ink, red, dens, keep, tags = layout(st, sid, when).print_ink(rng)
     h, w = ink.shape
     ink = thermal_ink(ink, dens, keep, rng)[..., None]
-    rgb = paper_tone(h, w, rng) * (1 - ink) + INK_RGB * ink
+    red = thermal_ink(red, dens, keep, rng)[..., None] * 0.92
+    rgb = paper_tone(h, w, rng)
+    rgb = rgb * (1 - red) + RED_RGB * red
+    rgb = rgb * (1 - ink) + INK_RGB * ink
+    if "total" in tags:
+        stamp = rubber_stamp(h, w, tags["total"], rng, bottom="CLAUDE MAX" if not st["metered"] else "API")[..., None]
+        rgb = rgb * (1 - stamp) + STAMP_RGB * stamp
     mask = outline(h, w, rng)
     if rng.random() < 0.45:
         dog_ear(rgb, mask, rng)

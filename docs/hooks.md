@@ -179,6 +179,12 @@ worker) gets four lines. A longer one gets a token and cost block, the top three
 an orchestration block only when Codex, Gemini or Jev actually ran (otherwise one line,
 "Claude only"). HTML parse mode, `<pre>` blocks for aligned numbers, one phone screen at most.
 
+When it is sent: only when a person leaves an interactive session (`/exit`, Ctrl+D, Ctrl+C,
+logout). Headless sessions (`claude -p`, SDK, scripts: `CLAUDE_CODE_ENTRYPOINT` or the
+transcript `entrypoint` starts with `sdk`) and `/clear` or `/resume` (the terminal stays open on
+a new session) still print the terminal ticket but send nothing. SessionEnd never fires after a
+single reply.
+
 Failure rules, Telegram can never break the ticket:
 
 - PNG fails: text message. Telegram fails: the ticket is already printed. Everything fails:

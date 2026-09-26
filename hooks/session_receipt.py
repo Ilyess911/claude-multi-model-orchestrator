@@ -438,6 +438,28 @@ def receipt_png(payload):
         return None
 
 
+def interactive_exit(data, path):
+    """True only when a person leaves an interactive session (/exit, Ctrl+D, Ctrl+C, logout).
+
+    Headless runs (`claude -p`, SDK, scripts) and /clear or /resume, which keep the terminal
+    open on a new session, get the terminal ticket but no Telegram message.
+    """
+    if data.get("reason") in ("clear", "resume"):
+        return False
+    entry = os.environ.get("CLAUDE_CODE_ENTRYPOINT", "")
+    if not entry:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                for _, line in zip(range(50), f):
+                    m = re.search(r'"entrypoint":"([^"]*)"', line)
+                    if m:
+                        entry = m.group(1)
+                        break
+        except OSError:
+            pass
+    return not entry.startswith("sdk")
+
+
 def telegram_payload(st, session_id=""):
     """What the detached child receives: the metrics already computed, no transcript."""
     m = dict(st, unpriced=sorted(st["unpriced"]))
@@ -560,7 +582,8 @@ def main():
         sys.stderr.write(text + "\n")
     # After the ticket, never before: Telegram cannot delay or break the terminal output.
     try:
-        telegram_spawn(telegram_payload(st, data.get("session_id", "")))
+        if interactive_exit(data, path):
+            telegram_spawn(telegram_payload(st, data.get("session_id", "")))
     except Exception as err:
         log_error(f"telegram build failed: {type(err).__name__}")
 

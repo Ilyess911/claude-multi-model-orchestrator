@@ -134,23 +134,36 @@ terminal ticket, the PNG and the text message all read the same metrics dict.
 
 #### Thermal receipt PNG
 
-`receipt_png.py` draws a vertical receipt about 830 px wide, height following the content:
-off-white paper with a light seeded grain, torn top and bottom edges, a dark backdrop (Telegram
-converts photos, so no transparency), Menlo from macOS (fallbacks SF Mono, Courier New,
-Courier, Pillow default), black ink with a slight bleed. Sections: header, date and short
-session id, models, tokens, activity (top 3 tools and top 3 skills), an ORCHESTRATION block
-only when Codex, Gemini or Jev ran, session time, costs, footer. "API EQUIVALENT" is grey and
-marked "reference only, not billed"; "ACTUALLY BILLED" is the large boxed total. The barcode
-is a real Code128 of the 8-character short id (python-barcode), with a deterministic
-decorative fallback. Local, deterministic, no network, around 150 to 350 ms. The PNG is kept
+`receipt_png.py` prints a retro register slip, then turns it into a physical piece of paper.
+
+- Print: Andale Mono (macOS, fallbacks Courier New, Menlo, Pillow default) on a 42-column
+  grid, double-size lines for the title and the total, dotted leaders (`INPUT ..... 76`),
+  `=`, `-` and `. . .` rules. Sections: header (CLAUDE ORCHESTRATOR, SYS, ROUTER, date,
+  short session id), models, tokens, activity (top 3 tools and skills), routing (Codex,
+  Gemini, Jev in bold only when used), duration, billing, footer, Code128 barcode of the
+  8-character short id (python-barcode, seeded decorative fallback).
+- Billing cannot be misread: "SUBTOTAL / API EQUIV" is grey and marked "reference value only,
+  never charged"; "ACTUALLY CHARGED" and the double-size "TOTAL CHARGED" carry the real cost.
+- Thermal ink: per-line head pressure, a head fade across the width, a few lighter glyphs, one
+  or two weak heater rows, slight bleed. Rows holding key figures keep at least 93 % density.
+- Paper: warm off-white, fibres, grain, whiteness drift, a few micro-marks, worn edges, cut
+  top, torn bottom, uneven sides, sometimes a folded top corner showing the reverse side.
+- Physical: one or two horizontal creases and sometimes a short diagonal one (raking light:
+  bright flank, dark flank, thin valley), micro-waves, a bow, a tilt of a few tenths of a
+  degree, a slight keystone, a soft two-layer shadow on a neutral grey backdrop (Telegram
+  flattens transparency to white, so the backdrop is opaque).
+- Deterministic: every variation comes from a generator seeded with the short session id.
+  Same session, same bytes; another session, other creases, tilt, tear and grain.
+
+About 900 x 2500 px, 0.5 to 0.8 s including PNG encoding, local, no network. The PNG is kept
 in memory and never written to disk by the hook.
 
-Pillow lives in a dedicated venv used only by the detached child, so the terminal ticket keeps
-zero dependencies:
+Pillow and numpy live in a dedicated venv used only by the detached child, so the terminal
+ticket keeps zero dependencies:
 
 ```
 uv venv ~/.claude/venvs/session-receipt --python /opt/homebrew/bin/python3
-uv pip install --python ~/.claude/venvs/session-receipt/bin/python pillow python-barcode
+uv pip install --python ~/.claude/venvs/session-receipt/bin/python pillow numpy python-barcode
 ```
 
 Without the venv the child runs on the hook's Python, the import fails and the text message is

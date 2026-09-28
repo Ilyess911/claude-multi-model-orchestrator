@@ -288,6 +288,10 @@ Failure rules, Telegram can never break the ticket:
   online or not.
 - 5 s timeout, one retry on a network error only, no retry on an HTTP error (bad token,
   blocked bot, bad chat id).
+- Still offline after that (a proxy blocking `api.telegram.org`, no network): the payload,
+  metrics only, is kept in `~/.claude/state/receipt-queue/`. The next interactive session end
+  sends the queue oldest first, then its own ticket. 20 tickets at most, a week at most. Each
+  file is claimed by an atomic rename, so two sessions ending together never send one twice.
 - Errors go to `~/.claude/logs/session-ticket-error.log` as a class or HTTP code only, never
   the token, the chat id or the message.
 - Token or chat id missing: nothing is sent, nothing is logged.

@@ -637,6 +637,65 @@ def telegram_send(text, png=None):
     return tg_call(lambda: tg_api(token, "sendMessage", params))
 
 
+QUEUE_DIR = os.path.expanduser("~/.claude/state/receipt-queue")
+QUEUE_MAX = 20            # oldest dropped beyond this
+QUEUE_TTL = 7 * 86400     # a week-old ticket is no longer worth sending
+
+
+def send_payload(payload):
+    png = receipt_png(payload) if os.environ.get("CLAUDE_TELEGRAM_PHOTO", "1") != "0" else None
+    return telegram_send(payload["text"], png)
+
+
+def queue_put(payload):
+    """Keep a ticket that hit a network error; same metrics-only payload, nothing more."""
+    try:
+        os.makedirs(QUEUE_DIR, exist_ok=True)
+        name = f"{time.time():.6f}-{payload.get('sid', '')[:8] or 'nosid'}.json"
+        tmp = os.path.join(QUEUE_DIR, "." + name)
+        with open(tmp, "w") as f:
+            json.dump(payload, f)
+        os.replace(tmp, os.path.join(QUEUE_DIR, name))
+        for old in sorted(glob.glob(os.path.join(QUEUE_DIR, "*.json")))[:-QUEUE_MAX]:
+            os.remove(old)
+    except OSError as err:
+        log_error(f"queue write failed: {type(err).__name__}")
+
+
+def queue_flush():
+    """Send queued tickets oldest first. Stops at the first network error: still offline.
+
+    Each file is claimed by an atomic rename, so two sessions ending together never send
+    the same ticket twice.
+    """
+    for path in sorted(glob.glob(os.path.join(QUEUE_DIR, "*.json"))):
+        claim = path + ".sending"
+        try:
+            os.rename(path, claim)
+        except OSError:
+            continue  # taken by another child
+        try:
+            if time.time() - os.path.getmtime(claim) > QUEUE_TTL:
+                os.remove(claim)
+                continue
+            with open(claim) as f:
+                payload = json.load(f)
+        except (OSError, ValueError):
+            try:
+                os.remove(claim)
+            except OSError:
+                pass
+            continue
+        err = send_payload(payload)
+        if err.startswith("network"):
+            os.rename(claim, path)
+            return err
+        if err and err != "not configured":
+            log_error(f"telegram queued: {err}")
+        os.remove(claim)
+    return ""
+
+
 def receipt_png(payload):
     """PNG bytes, or None when Pillow or the renderer is unavailable (text fallback)."""
     try:
@@ -750,8 +809,11 @@ def main():
     arg = sys.argv[1] if len(sys.argv) > 1 else ""
     if arg == "--telegram-send":  # detached child of telegram_spawn
         payload = json.loads(sys.stdin.read())
-        png = receipt_png(payload) if os.environ.get("CLAUDE_TELEGRAM_PHOTO", "1") != "0" else None
-        err = telegram_send(payload["text"], png)
+        # Older tickets first, so they arrive in order; if the queue is still offline,
+        # the new one joins it without a second doomed attempt.
+        err = queue_flush() or send_payload(payload)
+        if err.startswith("network"):
+            queue_put(payload)
         if err and err != "not configured":
             log_error(f"telegram: {err}")
         return

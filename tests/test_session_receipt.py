@@ -246,5 +246,63 @@ class ReceiptTest(unittest.TestCase):
             self.assertFalse(sr.interactive_exit({"reason": "clear"}, self.paths["direct"]))
 
 
+class ReceiptQueueTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        patcher = mock.patch.object(sr, "QUEUE_DIR", self.tmp.name)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def queued(self):
+        return sorted(os.listdir(self.tmp.name))
+
+    def run_child(self, payload, send_results):
+        sent = []
+
+        def fake_send(p):
+            sent.append(p["sid"])
+            return send_results.pop(0)
+        with mock.patch.object(sr, "send_payload", fake_send), \
+             mock.patch.object(sr, "log_error"), \
+             mock.patch.object(sys, "argv", ["x", "--telegram-send"]), \
+             mock.patch.object(sys, "stdin", mock.Mock(read=lambda: json.dumps(payload))):
+            sr.main()
+        return sent
+
+    def test_offline_ticket_is_queued_then_sent_in_order(self):
+        self.assertEqual(self.run_child({"sid": "a"}, ["network URLError"]), ["a"])
+        self.assertEqual(len(self.queued()), 1)
+        # still offline: the queue fails first, the new ticket joins it without a send
+        self.assertEqual(self.run_child({"sid": "b"}, ["network URLError"]), ["a"])
+        self.assertEqual(len(self.queued()), 2)
+        # back online: a, b, then the current one
+        self.assertEqual(self.run_child({"sid": "c"}, ["", "", ""]), ["a", "b", "c"])
+        self.assertEqual(self.queued(), [])
+
+    def test_api_error_is_not_queued(self):
+        self.run_child({"sid": "a"}, ["http 403"])
+        self.assertEqual(self.queued(), [])
+
+    def test_queue_is_capped_and_expires(self):
+        for i in range(sr.QUEUE_MAX + 3):
+            sr.queue_put({"sid": f"s{i}"})
+        self.assertEqual(len(self.queued()), sr.QUEUE_MAX)
+        old = os.path.join(self.tmp.name, self.queued()[0])
+        os.utime(old, (0, 0))
+        sent = []
+        with mock.patch.object(sr, "send_payload", lambda p: sent.append(p["sid"]) or ""):
+            sr.queue_flush()
+        self.assertEqual(len(sent), sr.QUEUE_MAX - 1)
+        self.assertEqual(self.queued(), [])
+
+    def test_claimed_file_is_skipped(self):
+        sr.queue_put({"sid": "a"})
+        name = self.queued()[0]
+        os.rename(os.path.join(self.tmp.name, name), os.path.join(self.tmp.name, name + ".sending"))
+        with mock.patch.object(sr, "send_payload", side_effect=AssertionError):
+            self.assertEqual(sr.queue_flush(), "")
+
+
 if __name__ == "__main__":
     unittest.main()

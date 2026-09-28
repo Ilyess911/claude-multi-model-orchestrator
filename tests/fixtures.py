@@ -224,6 +224,16 @@ FIXTURES["workers_edge"] = ([
                   + status("codex", "analyze", "ok", 0, CX_TOK)),
 ], {})
 
+# Codex wrote outside its --scope (exit 5); Claude then inspects the extra file itself.
+FIXTURES["codex_scope"] = ([
+    prompt("Implement the demo change in src only", 0),
+    assistant("msg_s1", 5, tools=[bash(CODEX.format("implement") + " --scope src")]),
+    worker_result(60, "msg_s1-tool0", "done\n\n[scope] Codex changed files outside its write scope. "
+                  "Nothing was reverted:\n  README.md  (modified)\n[scope] Allowed: src \n"
+                  + status("codex", "implement", "scope", 5, CX_TOK), error=True),
+    assistant("msg_s2", 70, tools=[bash("git diff README.md")]),
+], {})
+
 
 def write_all(root):
     """Write every fixture under root, return {name: transcript path}."""

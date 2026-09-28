@@ -28,7 +28,8 @@ Read from the live machine on 2026-09-22. Paths are written with `~` for the hom
 │   ├── ai-status.sh              local availability probe, zero model calls
 │   ├── caveman-statusline.sh     stable wrapper, resolves the plugin script by glob
 │   ├── codex-worker.sh           bounded Codex call, sandboxed
-│   └── gemini-worker.sh          bounded Gemini call through agy, read only
+│   ├── gemini-worker.sh          bounded Gemini call through agy, read only
+│   └── scope-check.py            write-scope check for codex-worker.sh --mode implement
 ├── hooks/
 │   ├── graphify_session_start.py SessionStart graph freshness
 │   ├── repeat_tool_guard.py      PreToolUse + UserPromptSubmit: repeated identical calls

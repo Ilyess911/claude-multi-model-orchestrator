@@ -166,7 +166,7 @@ ai-worker: gemini mode=analyze status=timeout exit=3 tokens=unavailable
 ```
 
 `status` follows the exit code: 0 `ok`, 3 `timeout`, 4 `unavailable` (not installed or billing
-guard), anything else `fail`. Exit codes are unchanged. `tokens` is copied from what the CLI
+guard), 5 `scope` (Codex wrote outside its `--scope`, shown as SCOPE), anything else `fail`. Exit codes are unchanged. `tokens` is copied from what the CLI
 reports, never estimated: the sum of `turn.completed.usage` events of `codex exec --json`
 (`input_tokens`, `cached_input_tokens`, `output_tokens`, `reasoning_output_tokens`), and the
 `usage` of agy's `result` event (`input_tokens`, `cache_read_tokens`, `output_tokens`,

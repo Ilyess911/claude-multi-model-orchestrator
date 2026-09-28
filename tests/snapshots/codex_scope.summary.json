@@ -10,12 +10,12 @@
     0.0
    ],
    "in": [
-    100,
-    0.0004
+    200,
+    0.0008
    ],
    "out": [
-    50,
-    0.001
+    100,
+    0.002
    ],
    "web": [
     0,
@@ -23,50 +23,55 @@
    ]
   }
  },
- "codex": 0,
+ "codex": 1,
  "cr": 0,
  "cw": 0,
- "dur": "0min20",
- "equiv": 0.0014,
- "gemini": 1,
+ "dur": "1min10",
+ "equiv": 0.0028,
+ "gemini": 0,
  "jev": 0,
  "metered": false,
  "models": {
-  "claude-opus-5-5": 1
+  "claude-opus-5-5": 2
  },
  "real": 0.0,
  "routes": {
-  "CODEX": 0,
+  "CODEX": 1,
   "DIRECT": 0,
-  "GEMINI": 1,
+  "GEMINI": 0,
   "PARALLEL": 0,
   "REVIEW": 0
  },
- "secs": 20,
+ "secs": 70,
  "skills": {},
- "tin": 100,
+ "tin": 200,
  "tool_counts": {
-  "Bash": 1
+  "Bash": 2
  },
- "tout": 50,
+ "tout": 100,
  "unpriced": [],
  "workers": {
   "codex": {
    "fail": 0,
    "ok": 0,
-   "runs": 0,
-   "scope": 0,
+   "runs": 1,
+   "scope": 1,
    "timeout": 0,
-   "tok_runs": 0,
-   "tokens": null,
+   "tok_runs": 1,
+   "tokens": {
+    "cache": 800,
+    "in": 1200,
+    "out": 300,
+    "think": 50
+   },
    "unavailable": 0,
    "unknown": 0
   },
   "fallback": 1,
   "gemini": {
-   "fail": 1,
+   "fail": 0,
    "ok": 0,
-   "runs": 1,
+   "runs": 0,
    "scope": 0,
    "timeout": 0,
    "tok_runs": 0,

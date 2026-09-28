@@ -72,13 +72,13 @@ ROUTES = ("DIRECT", "CODEX", "GEMINI", "REVIEW", "PARALLEL")
 # in the tool result (stderr sent to a file or /dev/null, raw CLI call, session cut short)
 # stays UNKNOWN: nothing is inferred.
 # Whole lines only, so a line quoted inside a model's answer rarely qualifies.
-STATUS_RE = re.compile(r"^ai-worker: (codex|gemini) mode=\S+ status=(ok|fail|timeout|unavailable) "
+STATUS_RE = re.compile(r"^ai-worker: (codex|gemini) mode=\S+ status=(ok|fail|timeout|unavailable|scope) "
                        r"exit=\d+ tokens=(unavailable|in:\d+,cache:\d+,out:\d+,think:\d+)[ \t]*$",
                        re.MULTILINE)
 # Every worker run of a command, in command order. Raw CLI runs print no status line.
 RUN_RE = re.compile(r"(?P<wrap>codex|gemini)-worker\.sh[\"']?\s+--mode"
                     r"|(?:^|[;&|(]\s*)(?:(?P<rawc>codex)\s+exec\b|(?P<rawg>agy)\s+-)")
-FAILED = ("fail", "timeout", "unavailable")
+FAILED = ("fail", "timeout", "unavailable", "scope")
 
 
 def is_prompt(d):
@@ -143,7 +143,7 @@ def worker_stats(calls):
     A retry is a run that follows a failed run of the same worker in the same prompt turn.
     A fallback to Claude is a turn whose last worker run failed: Claude finished the task.
     """
-    out = {w: {"ok": 0, "fail": 0, "timeout": 0, "unavailable": 0, "unknown": 0,
+    out = {w: {"ok": 0, "fail": 0, "timeout": 0, "unavailable": 0, "scope": 0, "unknown": 0,
                "tokens": None, "tok_runs": 0, "runs": 0} for w in ("codex", "gemini")}
     for c in calls:
         o = out[c["w"]]
@@ -365,7 +365,7 @@ def summarize(path):
 def worker_outcome(o):
     """'2 OK / 1 FAIL', only the non-zero parts. unavailable (exit 4) counts as FAIL."""
     parts = [(o["ok"], "OK"), (o["fail"] + o["unavailable"], "FAIL"), (o["timeout"], "TIMEOUT"),
-             (o["unknown"], "UNKNOWN")]
+             (o.get("scope", 0), "SCOPE"), (o["unknown"], "UNKNOWN")]
     parts = [(n, lab) for n, lab in parts if n]
     txt = " / ".join(f"{n} {lab}" for n, lab in parts)
     if len(txt) > W - 12:  # keep the worker name readable on the 40-column ticket
@@ -380,7 +380,8 @@ def worker_problems(st):
     out = []
     for w, name in (("codex", "Codex"), ("gemini", "Gemini")):
         o = ws.get(w) or {}
-        bad = [(o.get("fail", 0) + o.get("unavailable", 0), "FAIL"), (o.get("timeout", 0), "TIMEOUT")]
+        bad = [(o.get("fail", 0) + o.get("unavailable", 0), "FAIL"), (o.get("timeout", 0), "TIMEOUT"),
+               (o.get("scope", 0), "SCOPE")]
         bad = [f"{n} {lab}" for n, lab in bad if n]
         if bad:
             out.append(f"{name} " + "/".join(bad))

@@ -55,6 +55,7 @@
    "fail": 0,
    "ok": 2,
    "runs": 4,
+   "scope": 0,
    "timeout": 0,
    "tok_runs": 2,
    "tokens": {
@@ -71,6 +72,7 @@
    "fail": 0,
    "ok": 0,
    "runs": 1,
+   "scope": 0,
    "timeout": 1,
    "tok_runs": 0,
    "tokens": null,

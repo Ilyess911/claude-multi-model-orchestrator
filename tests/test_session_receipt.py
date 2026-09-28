@@ -158,7 +158,7 @@ class ReceiptTest(unittest.TestCase):
 
     def outcome(self, name, worker):
         o = self.w(name)[worker]
-        return {k: o[k] for k in ("ok", "fail", "timeout", "unavailable", "unknown") if o[k]}
+        return {k: o[k] for k in ("ok", "fail", "timeout", "unavailable", "scope", "unknown") if o[k]}
 
     def test_codex_success(self):
         ws = self.w("codex_success")
@@ -209,6 +209,13 @@ class ReceiptTest(unittest.TestCase):
         self.assertEqual(self.outcome("workers_edge", "gemini"), {"fail": 1})
         self.assertEqual(ws["fallback"], 1)  # only case 1
         self.assertEqual(ws["codex"]["tokens"]["in"], 1200)  # the quoted 999 is never counted
+
+    def test_scope_violation(self):
+        ws = self.w("codex_scope")
+        self.assertEqual(self.outcome("codex_scope", "codex"), {"scope": 1})
+        self.assertEqual(ws["fallback"], 1)
+        self.assertIn("1 SCOPE", sr.render(self.paths["codex_scope"], SID))
+        self.assertIn("Codex 1 SCOPE", sr.telegram_text(self.st("codex_scope"), SID).split("\n")[3])
 
     def test_no_status_line_means_unknown(self):
         self.assertEqual(self.outcome("codex", "codex"), {"unknown": 1})

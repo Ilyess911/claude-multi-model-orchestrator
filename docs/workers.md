@@ -27,7 +27,8 @@ Invocation, prompt on stdin:
 
 ```sh
 printf '<structured prompt>' | ~/.claude/bin/codex-worker.sh \
-  --mode review|analyze|implement --cd <dir> [--timeout 300] [--model M] [--schema FILE]
+  --mode review|analyze|implement --cd <dir> [--timeout 300] [--model M] [--schema FILE] \
+  [--scope PATH]...
 ```
 
 Mechanism and guards implemented in the wrapper:
@@ -41,10 +42,38 @@ Mechanism and guards implemented in the wrapper:
   output with `--output-schema`.
 - Timeout via `perl alarm` because macOS ships no coreutils `timeout`.
 - Exit codes: 0 result on stdout, 1 worker error, 2 bad usage, 3 timeout, 4 unavailable or
-  blocked by the billing guard. A timeout exits 3 even when codex left a partial answer.
+  blocked by the billing guard, 5 change outside `--scope` ([Write scope](#write-scope)). A
+  timeout exits 3 even when codex left a partial answer.
 - Last stderr line on every exit: `ai-worker: codex mode=… status=… exit=… tokens=…`, with the
   token usage summed from `codex exec --json` events. Read by the session receipt, see
   [hooks.md](hooks.md#worker-telemetry).
+
+### Write scope
+
+Idea taken from the advisory `writeScopes` of DeepSeek Harness agent teams, reimplemented as a
+check that is verified after the run instead of declared.
+
+```sh
+printf '<prompt>' | ~/.claude/bin/codex-worker.sh --mode implement --cd <repo> \
+  --scope src/parser.py --scope tests/ --scope 'docs/**/*.md'
+```
+
+- A scope is relative to the repository root: an exact file, a directory (everything below
+  it) or a glob. `*` and `?` stay inside one directory level, `**` crosses levels.
+- Before the run, `scope-check.py` (next to the wrapper) records HEAD and, for every path git
+  reports as changed or untracked, its status, a hash of the work-tree bytes and the staged
+  blob id. After the run, whatever codex's outcome, it compares again.
+- A path whose entry appeared, disappeared or changed outside the scope is a violation, and
+  so is a moved HEAD (commit, reset, checkout). Work that was already uncommitted before the
+  run is compared by content, so it is never blamed on Codex, and an edit to it is caught.
+- On a violation the answer is followed by a `[scope]` block listing each path and what
+  happened (modified, new file, deleted, restored or removed, staged content changed), then
+  the allowed scopes. Exit 5, status line `status=scope`, even when codex also failed or timed
+  out. **Nothing is reverted**: Claude reads each listed file with `git diff` and decides.
+- `--scope` outside a git repository is refused (exit 2) rather than run unchecked. Without
+  `--scope`, behaviour is unchanged. Review and analyze modes ignore it: they cannot write.
+- Not visible, so not checked: gitignored files and paths outside the repository. The
+  workspace-write sandbox already confines Codex to the working directory and temp dirs.
 
 Good fit: isolatable implementation against a crisp spec, focused refactoring, writing tests,
 bounded engineering analysis, independent review of something Claude wrote. Weak fit: anything

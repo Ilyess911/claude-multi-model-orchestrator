@@ -1,0 +1,37 @@
+<b>🤖 Claude Orchestrator</b>
+<i>Session terminée · <now></i>
+
+🔴 <b>Workers : Codex 1 SCOPE · fallback Claude</b>
+
+🧠 Opus 5.5
+⏱ 1 min · 🔄 2 requêtes
+
+<pre>TOKENS
+Input        200
+Output       100
+Cache          0
+Total        300
+
+COÛT
+Équiv. API $0.00
+Facturé    $0.00</pre>
+
+🛠 2 appels outils
+🧩 Aucun skill
+
+<b>🧭 Orchestration</b>
+<pre>Claude → principal
+Codex  → 1 SCOPE
+Gemini → 0 délégation
+Jev    → 0 appel</pre>
+
+<b>🔀 Routing</b>
+<pre>DIRECT         0
+CODEX          1
+GEMINI         0
+CROSS REVIEW   0
+PARALLEL       0</pre>
+
+🟢 Aucun coût supplémentaire
+
+🧾 <code>ticket fixture0</code> · #ClaudeCode

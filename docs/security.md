@@ -48,6 +48,10 @@ without asking, and anything external is flagged first.
   answer.
 - `codex-worker.sh --mode review|analyze` and both Gemini modes are read-only sandboxes. Write
   access is granted only by an explicit `--mode implement`.
+- Write scope: in a git repository, `--mode implement` gets one `--scope` per file, directory
+  or glob the subtask may change. Any change outside it, or a moved HEAD, is reported and the
+  worker exits 5. Nothing is reverted automatically; Claude checks each listed file with
+  `git diff` before keeping or restoring it. See [workers.md](workers.md#write-scope).
 
 ## Repository safety
 

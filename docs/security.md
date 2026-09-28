@@ -66,7 +66,6 @@ without asking, and anything external is flagged first.
 
 ## Harness note
 
-The global permission mode is `bypassPermissions`, with a 236-entry allowlist in
-`~/.claude/settings.local.json`. That trades prompt friction for speed, and it is the reason
-the destructive-operation rules above are policy rather than a dialog box. Anyone reproducing
+The permission mode trades confirmation dialogs for speed, and that is the reason the
+destructive-operation rules above are policy rather than a dialog box. Anyone reproducing
 this setup should decide that trade-off deliberately rather than copying it.

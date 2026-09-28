@@ -7,7 +7,7 @@
 ![status](https://img.shields.io/badge/status-in%20use-success)
 ![scope](https://img.shields.io/badge/scope-personal%20setup-blue)
 ![host](https://img.shields.io/badge/host-macOS-lightgrey)
-![visibility](https://img.shields.io/badge/repository-private-critical)
+![visibility](https://img.shields.io/badge/repository-public-brightgreen)
 ![license](https://img.shields.io/badge/license-all%20rights%20reserved-inactive)
 
 Documentation of the real Claude Code orchestration layer installed on my Mac:
@@ -136,13 +136,13 @@ because no TypeSafe key exists in the Keychain. Nothing depends on it.
 
 No open source license is granted. The setup described here wires together third-party tools
 (Claude Code, Codex CLI, Antigravity CLI, Graphify, Jev, community plugins) that keep their own
-licenses. Relicensing them would be wrong, so this repository stays private and reserved.
+licenses. Relicensing them would be wrong, so this repository is published for reading only, all rights reserved.
 See [LICENSE](LICENSE).
 
 ---
 
 <div align="center">
 
-Private personal infrastructure documentation. Nothing here is a credential.
+Personal infrastructure documentation. Nothing here is a credential.
 
 </div>

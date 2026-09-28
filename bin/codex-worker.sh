@@ -19,12 +19,12 @@
 # <usage> is in:N,cache:N,out:N,think:N summed from the turn.completed events of
 # `codex exec --json`, or `unavailable` when codex reported none.
 MODE=review; CD="$PWD"; TIMEOUT=300; MODEL=""; SCHEMA=""; TOK=unavailable; EV=""
-SCOPEF=""; SNAP=""; HERE=$(cd "$(dirname "$0")" && pwd)
+SCOPEF=""; SNAP=""; ERR=""; HERE=$(cd "$(dirname "$0")" && pwd)
 status_line() {
   case "$1" in 0) S=ok ;; 3) S=timeout ;; 4) S=unavailable ;; 5) S=scope ;; *) S=fail ;; esac
   echo "ai-worker: codex mode=$MODE status=$S exit=$1 tokens=$TOK" >&2
 }
-trap 'RC_=$?; rm -f $EV $SCOPEF $SNAP; status_line $RC_' EXIT
+trap 'RC_=$?; rm -f "$EV" "$ERR" $SCOPEF $SNAP; status_line $RC_' EXIT
 need() { [ $# -ge 2 ] || { echo "$1 requires a value" >&2; exit 2; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -57,12 +57,13 @@ fi
 
 OUT=$(mktemp -t codex-worker)
 EV=$(mktemp -t codex-worker-ev)
+ERR=$(mktemp -t codex-worker-err)
 set -- exec -s "$SANDBOX" --ephemeral --skip-git-repo-check --json -C "$CD" -o "$OUT"
 [ -n "$MODEL" ] && set -- "$@" -m "$MODEL"
 [ -n "$SCHEMA" ] && set -- "$@" --output-schema "$SCHEMA"
 
 # macOS has no coreutils timeout; perl's alarm is always present.
-perl -e 'alarm shift; exec @ARGV' "$TIMEOUT" codex "$@" - >"$EV" 2>/tmp/.codex-worker-err
+perl -e 'alarm shift; exec @ARGV' "$TIMEOUT" codex "$@" - >"$EV" 2>"$ERR"
 RC=$?
 # Token usage exactly as codex reports it; nothing is estimated.
 TOK=$(python3 - "$EV" <<'PY' 2>/dev/null || echo unavailable
@@ -101,7 +102,7 @@ if [ $RC -eq 142 ] || [ $RC -eq 14 ]; then
   [ -n "$SCOPE_BAD" ] && exit 5; exit 3
 fi
 if [ $RC -ne 0 ] && [ ! -s "$OUT" ]; then
-  echo "codex-worker: codex exited $RC" >&2; tail -3 /tmp/.codex-worker-err >&2; scope_report >&2
+  echo "codex-worker: codex exited $RC" >&2; tail -3 "$ERR" >&2; scope_report >&2
   rm -f "$OUT"; [ -n "$SCOPE_BAD" ] && exit 5; exit 1
 fi
 cat "$OUT"

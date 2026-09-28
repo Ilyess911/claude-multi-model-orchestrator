@@ -485,6 +485,9 @@ def keychain(service):
 def keychain_store(service, value):
     """Write through `security -i` so the value never appears in a process argv."""
     user = os.environ.get("USER", "claude")
+    # The line is parsed by `security -i`: a quote, backslash or newline would break out of it.
+    if any(c in f"{user}{service}{value}" for c in '"\\\n\r'):
+        return False
     cmd = f'add-generic-password -U -a "{user}" -s "{service}" -w "{value}"\n'
     r = subprocess.run(["security", "-i"], input=cmd, capture_output=True, text=True, timeout=5)
     return r.returncode == 0 and not r.stderr.strip()
@@ -650,10 +653,10 @@ def send_payload(payload):
 def queue_put(payload):
     """Keep a ticket that hit a network error; same metrics-only payload, nothing more."""
     try:
-        os.makedirs(QUEUE_DIR, exist_ok=True)
+        os.makedirs(QUEUE_DIR, mode=0o700, exist_ok=True)
         name = f"{time.time():.6f}-{payload.get('sid', '')[:8] or 'nosid'}.json"
         tmp = os.path.join(QUEUE_DIR, "." + name)
-        with open(tmp, "w") as f:
+        with os.fdopen(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
             json.dump(payload, f)
         os.replace(tmp, os.path.join(QUEUE_DIR, name))
         for old in sorted(glob.glob(os.path.join(QUEUE_DIR, "*.json")))[:-QUEUE_MAX]:

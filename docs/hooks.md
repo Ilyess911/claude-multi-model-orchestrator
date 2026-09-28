@@ -131,6 +131,7 @@ What the receipt shows:
 | Input, output, cache read, cache write, total | `message.usage` as returned by the API |
 | Tools and skills | `tool_use` blocks; skills are `Skill` calls, counted by skill name |
 | Codex, Gemini | Bash calls that invoke `codex-worker.sh --mode` / `gemini-worker.sh --mode` (or `codex exec`, `agy -`); a `grep` or `cat` on the scripts does not count |
+| Worker outcomes | The `ai-worker:` status line each wrapper prints last on stderr, read from the Bash tool result, see [Worker telemetry](#worker-telemetry) |
 | Jev | `mcp__jev__*` tool calls |
 | Duration | first to last transcript timestamp |
 | API equivalent | per-model rates, see below |
@@ -147,9 +148,59 @@ Two costs, kept apart on purpose:
   "us"` (x1.1) and web search ($10 per 1,000) are applied when the usage block reports them.
   An unknown model id is listed as "sans tarif" instead of being guessed.
 
-Codex and Gemini get no API equivalent. `codex-worker.sh` runs `codex exec --ephemeral` with
-stdout discarded and `agy` reports no token usage, so no exact data exists to convert. The
-receipt shows the delegation count and "quota non mesure".
+Codex and Gemini get no API equivalent: both run on subscriptions with no public per-token
+price. Their token counts are shown as the workers report them, never converted to dollars.
+
+### Worker telemetry
+
+Idea taken from DeepSeek Harness's separate operational event channel, reimplemented with no
+log file and no database: the data travels in the transcript Claude Code already writes.
+
+Each wrapper (`bin/codex-worker.sh`, `bin/gemini-worker.sh`, live copies in `~/.claude/bin/`)
+prints one last line on stderr on every exit path, including argument errors and the billing
+guard:
+
+```
+ai-worker: codex mode=review status=ok exit=0 tokens=in:11924,cache:11648,out:5,think:0
+ai-worker: gemini mode=analyze status=timeout exit=3 tokens=unavailable
+```
+
+`status` follows the exit code: 0 `ok`, 3 `timeout`, 4 `unavailable` (not installed or billing
+guard), anything else `fail`. Exit codes are unchanged. `tokens` is copied from what the CLI
+reports, never estimated: the sum of `turn.completed.usage` events of `codex exec --json`
+(`input_tokens`, `cached_input_tokens`, `output_tokens`, `reasoning_output_tokens`), and the
+`usage` of agy's `result` event (`input_tokens`, `cache_read_tokens`, `output_tokens`,
+`thinking_tokens`). When the CLI reports nothing, the value is `unavailable`. agy reports zeros
+for a turn cut by its own timeout; the receipt shows those zeros as reported.
+
+The receipt reads these lines from the Bash tool result of the call:
+
+- A run whose line is absent is **UNKNOWN**, never guessed: stderr sent to a file or
+  `/dev/null`, a raw `codex exec` or `agy` call, a session cut before the result, or any
+  transcript older than this telemetry.
+- Only whole lines count, matched per worker in command order. One run with several candidate
+  lines takes the last one (stderr follows the model's answer, which may quote such a line).
+  When the number of lines and runs of a worker in one command disagree, those runs stay UNKNOWN.
+- **Retry:** a run that follows a failed or timed-out run of the same worker in the same prompt turn.
+- **Fallback to Claude:** a prompt turn whose last worker run failed. Nothing ran after it,
+  so Claude finished the task. Another worker taking over is not counted as a Claude fallback.
+- Subagent transcripts count in the outcomes but not in retries and fallbacks, which are per
+  prompt turn of the main transcript.
+
+What it looks like. A clean session:
+
+```
+WORKERS
+  Codex                             2 OK
+  Gemini                            1 OK
+  Jev                                  0
+  tok Codex             1,2 k in/350 out
+```
+
+A session with a problem adds `RETRY` and `FALLBACK` lines only when non-zero, puts a red
+`🔴 Workers : Codex 1 FAIL · fallback Claude` line at the top of the Telegram message, and a
+red `INCIDENT` line in the brigade section of the PNG. `(partiel)` after a token count means
+some runs of that worker reported no usage.
 
 Manual run on any transcript: `python3 ~/.claude/hooks/session_receipt.py <transcript.jsonl>`.
 When prices change, update the `PRICES` table at the top of the script.
@@ -212,8 +263,8 @@ Without the venv the child runs on the hook's Python, the import fails and the t
 sent instead. `CLAUDE_TELEGRAM_PHOTO=0` forces the text message.
 
 What is sent: date and time, duration, models, request count, tokens (input, output, cache,
-total), tool call count, skill names and counts, Codex and Gemini delegation counts, Jev
-calls, API equivalent, real billed cost, first 8 characters of the session id. What is never
+total), tool call count, skill names and counts, Codex and Gemini delegation counts and
+outcomes (OK, FAIL, TIMEOUT, UNKNOWN, retries, fallbacks, reported token counts), Jev calls, API equivalent, real billed cost, first 8 characters of the session id. What is never
 sent: prompts, replies, code, file names, paths, repository content, transcripts, secrets.
 
 The message adapts to the session. A short session (fewer than 15 requests, no skill, no

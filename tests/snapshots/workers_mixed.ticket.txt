@@ -3,41 +3,39 @@
            ticket de session
          <now>
 ========================================
-Opus 5.5                           3 req
-Haiku 4.5                          1 req
+Opus 5.5                           4 req
 ----------------------------------------
-Input                                800
-Output                               250
+Input                                400
+Output                               200
 Cache lecture                          0
 Cache ecriture                         0
-TOTAL TOKENS                       1 050
+TOTAL TOKENS                         600
 ----------------------------------------
-Outils                          3 appels
-  Bash                                x2
-  jev:jev_check                       x1
+Outils                          5 appels
+  Bash                                x5
 Skills                                 0
 ----------------------------------------
 WORKERS
-  Codex                        2 UNKNOWN
-  Gemini                               0
-  Jev                           1 appels
-  tok Codex                  unavailable
+  Codex                 2 OK / 2 UNKNOWN
+  Gemini                       1 TIMEOUT
+  Jev                                  0
+  tok Codex   2,4 k in/700 out (partiel)
+  tok Gemini                 unavailable
 ----------------------------------------
 ROUTING
-  DIRECT                               1
+  DIRECT                               0
   CODEX                                1
   GEMINI                               0
   CROSS REVIEW                         1
-  PARALLEL                             0
+  PARALLEL                             1
 ----------------------------------------
-Duree                               1h00
+Duree                             7min50
 ----------------------------------------
 EQUIVALENT API                    0.01 $
 COUT REEL FACTURE                 0.00 $
   Claude                  abonnement Max
   Codex/Gemini                abonnement
-FACTURATION SUPPL.                   OUI
-                                  Jev x1
+FACTURATION SUPPL.                aucune
 ========================================
          merci de votre visite
     │▍▐║  ▎▏│▍▐║█▌▎▏│▍▐║█ ▎▏│▍▐ █▌  │▍

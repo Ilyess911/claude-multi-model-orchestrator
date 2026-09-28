@@ -1,34 +1,36 @@
 <b>🤖 Claude Orchestrator</b>
 <i>Session terminée · <now></i>
 
+🔴 <b>Workers : Gemini 1 TIMEOUT</b>
+
 🧠 Opus 5.5
-⏱ 20 s · 🔄 2 requêtes
+⏱ 7 min · 🔄 4 requêtes
 
 <pre>TOKENS
-Input        200
-Output       100
+Input        400
+Output       200
 Cache          0
-Total        300
+Total        600
 
 COÛT
-Équiv. API $0.00
+Équiv. API $0.01
 Facturé    $0.00</pre>
 
-🛠 2 appels outils
+🛠 5 appels outils
 🧩 Aucun skill
 
 <b>🧭 Orchestration</b>
 <pre>Claude → principal
-Codex  → 1 UNKNOWN
-Gemini → 0 délégation
+Codex  → 2 OK / 2 UNKNOWN
+Gemini → 1 TIMEOUT
 Jev    → 0 appel</pre>
 
 <b>🔀 Routing</b>
 <pre>DIRECT         0
 CODEX          1
 GEMINI         0
-CROSS REVIEW   0
-PARALLEL       0</pre>
+CROSS REVIEW   1
+PARALLEL       1</pre>
 
 🟢 Aucun coût supplémentaire
 

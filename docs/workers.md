@@ -41,7 +41,10 @@ Mechanism and guards implemented in the wrapper:
   output with `--output-schema`.
 - Timeout via `perl alarm` because macOS ships no coreutils `timeout`.
 - Exit codes: 0 result on stdout, 1 worker error, 2 bad usage, 3 timeout, 4 unavailable or
-  blocked by the billing guard.
+  blocked by the billing guard. A timeout exits 3 even when codex left a partial answer.
+- Last stderr line on every exit: `ai-worker: codex mode=… status=… exit=… tokens=…`, with the
+  token usage summed from `codex exec --json` events. Read by the session receipt, see
+  [hooks.md](hooks.md#worker-telemetry).
 
 Good fit: isolatable implementation against a crisp spec, focused refactoring, writing tests,
 bounded engineering analysis, independent review of something Claude wrote. Weak fit: anything
@@ -77,6 +80,9 @@ Reliability work implemented in the wrapper:
   in Python, not with BSD `sed` or `grep -P`.
 - **Subscription-auth guard.** The wrapper refuses to run if `GEMINI_API_KEY` or
   `GOOGLE_API_KEY` is set, exiting 4 rather than reaching a metered API.
+- Last stderr line on every exit: `ai-worker: gemini mode=… status=… exit=… tokens=…`, with the
+  token usage of agy's `result` event. agy's own `--print-timeout` now exits 3, not 1. See
+  [hooks.md](hooks.md#worker-telemetry).
 - **Read only by design.** `~/.gemini/antigravity-cli/settings.json` allows `read_file`,
   `list_directory` and `grep_search` and denies `write_file` and `command`.
   `--dangerously-skip-permissions` is never passed.

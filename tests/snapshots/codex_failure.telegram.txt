@@ -1,8 +1,10 @@
 <b>🤖 Claude Orchestrator</b>
 <i>Session terminée · <now></i>
 
+🔴 <b>Workers : Codex 1 FAIL · fallback Claude</b>
+
 🧠 Opus 5.5
-⏱ 20 s · 🔄 2 requêtes
+⏱ 40 s · 🔄 2 requêtes
 
 <pre>TOKENS
 Input        200
@@ -19,15 +21,15 @@ Facturé    $0.00</pre>
 
 <b>🧭 Orchestration</b>
 <pre>Claude → principal
-Codex  → 1 UNKNOWN
+Codex  → 1 FAIL
 Gemini → 0 délégation
 Jev    → 0 appel</pre>
 
 <b>🔀 Routing</b>
 <pre>DIRECT         0
-CODEX          1
+CODEX          0
 GEMINI         0
-CROSS REVIEW   0
+CROSS REVIEW   1
 PARALLEL       0</pre>
 
 🟢 Aucun coût supplémentaire

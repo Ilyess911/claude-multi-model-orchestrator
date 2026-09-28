@@ -466,6 +466,9 @@ def layout(st, sid, when):
                              ("Jev, commis", "jev", "API")):
         n = st[key]
         t.item(str(n), label, tail if n else "-", tone=1.0 if n else 0.7, bold=bool(n))
+    problems = st.get("worker_problems") or []
+    if problems:
+        t.text("  INCIDENT  " + " / ".join(problems).upper(), 0.8, red=True)
     routes = st.get("routes") or {}
     if any(routes.values()):
         r = [f"{lab} {routes.get(k, 0)}" for k, lab in (("DIRECT", "DIR"), ("CODEX", "CDX"),

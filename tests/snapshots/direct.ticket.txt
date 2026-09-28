@@ -16,9 +16,11 @@ Outils                          2 appels
   Skill                               x1
 Skills                                 1
   demo-skill                          x1
-Codex                                  0
-Gemini                                 0
-Jev                                    0
+----------------------------------------
+WORKERS
+  Codex                                0
+  Gemini                               0
+  Jev                                  0
 ----------------------------------------
 ROUTING
   DIRECT                               1

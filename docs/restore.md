@@ -46,8 +46,8 @@ Recreate three scripts in `~/.claude/bin/`, all `chmod +x`:
 |---|---|
 | `ai-status.sh` | local-only availability probe, `--live` and `--json` flags, prints auth mode never keys |
 | `caveman-statusline.sh` | resolve the current plugin statusline script by glob, exit 0 when the plugin is absent |
-| `codex-worker.sh` | `codex exec`, `--ephemeral`, sandbox per mode, `auth_mode = chatgpt` guard, `perl alarm` timeout, exit codes 0/1/2/3/4 |
-| `gemini-worker.sh` | `agy` NDJSON stdin, structured `result` parsing, per-invocation `mktemp`, cleanup trap, API-key guard, outer `perl alarm` at timeout+30 |
+| `codex-worker.sh` | Versioned in [`bin/`](../bin/codex-worker.sh), copy it. `codex exec --json`, `--ephemeral`, sandbox per mode, `auth_mode = chatgpt` guard, `perl alarm` timeout, exit codes 0/1/2/3/4, final `ai-worker:` status line |
+| `gemini-worker.sh` | Versioned in [`bin/`](../bin/gemini-worker.sh), copy it. `agy` NDJSON stdin, structured `result` parsing, per-invocation `mktemp`, cleanup trap, API-key guard, outer `perl alarm` at timeout+30, final `ai-worker:` status line |
 
 And four skill files in `~/.claude/skills/ai-router/`: `SKILL.md`, `routing-policy.md`,
 `capabilities.md`, `billing-policy.md`. Plus three commands in `~/.claude/commands/`:

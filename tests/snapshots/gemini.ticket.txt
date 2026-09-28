@@ -14,10 +14,12 @@ TOTAL TOKENS                         150
 Outils                          1 appels
   Bash                                x1
 Skills                                 0
-Codex                                  0
-Gemini                          1 deleg.
-Jev                                    0
-  quota Codex/Gemini          non mesure
+----------------------------------------
+WORKERS
+  Codex                                0
+  Gemini                       1 UNKNOWN
+  Jev                                  0
+  tok Gemini                 unavailable
 ----------------------------------------
 ROUTING
   DIRECT                               0

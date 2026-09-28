@@ -6,38 +6,16 @@
     0.0
    ],
    "cw": [
-    1000000,
-    8.8
-   ],
-   "in": [
-    2000000,
-    12.4
-   ],
-   "out": [
-    100050,
-    4.0011
-   ],
-   "web": [
-    3,
-    0.03
-   ]
-  },
-  "demo-model-unknown": {
-   "cr": [
-    0,
-    0.0
-   ],
-   "cw": [
     0,
     0.0
    ],
    "in": [
-    10,
-    0.0
+    200,
+    0.0008
    ],
    "out": [
-    10,
-    0.0
+    100,
+    0.002
    ],
    "web": [
     0,
@@ -45,46 +23,46 @@
    ]
   }
  },
- "codex": 0,
+ "codex": 1,
  "cr": 0,
- "cw": 1000000,
- "dur": "0min08",
- "equiv": 25.2311,
+ "cw": 0,
+ "dur": "0min40",
+ "equiv": 0.0028,
  "gemini": 0,
  "jev": 0,
  "metered": false,
  "models": {
-  "claude-opus-5-5": 2,
-  "demo-model-unknown": 1
+  "claude-opus-5-5": 2
  },
  "real": 0.0,
  "routes": {
   "CODEX": 0,
-  "DIRECT": 1,
+  "DIRECT": 0,
   "GEMINI": 0,
   "PARALLEL": 0,
-  "REVIEW": 0
+  "REVIEW": 1
  },
- "secs": 8,
+ "secs": 40,
  "skills": {},
- "tin": 2000010,
- "tool_counts": {},
- "tout": 100060,
- "unpriced": [
-  "demo-model-unknown"
- ],
+ "tin": 200,
+ "tool_counts": {
+  "Bash": 1,
+  "Read": 1
+ },
+ "tout": 100,
+ "unpriced": [],
  "workers": {
   "codex": {
-   "fail": 0,
+   "fail": 1,
    "ok": 0,
-   "runs": 0,
+   "runs": 1,
    "timeout": 0,
    "tok_runs": 0,
    "tokens": null,
    "unavailable": 0,
    "unknown": 0
   },
-  "fallback": 0,
+  "fallback": 1,
   "gemini": {
    "fail": 0,
    "ok": 0,

@@ -68,6 +68,17 @@ CODEX_RE = re.compile(r"codex-worker\.sh[\"']?\s+--mode|(?:^|[;&|(]\s*)codex\s+e
 GEMINI_RE = re.compile(r"gemini-worker\.sh[\"']?\s+--mode|(?:^|[;&|(]\s*)agy\s+-")
 WORKER_MODE_RE = re.compile(r"(codex|gemini)-worker\.sh[\"']?\s+--mode[= ]+[\"']?(\w+)")
 ROUTES = ("DIRECT", "CODEX", "GEMINI", "REVIEW", "PARALLEL")
+# Last stderr line of every worker run (~/.claude/bin/*-worker.sh). A run whose line is not
+# in the tool result (stderr sent to a file or /dev/null, raw CLI call, session cut short)
+# stays UNKNOWN: nothing is inferred.
+# Whole lines only, so a line quoted inside a model's answer rarely qualifies.
+STATUS_RE = re.compile(r"^ai-worker: (codex|gemini) mode=\S+ status=(ok|fail|timeout|unavailable) "
+                       r"exit=\d+ tokens=(unavailable|in:\d+,cache:\d+,out:\d+,think:\d+)[ \t]*$",
+                       re.MULTILINE)
+# Every worker run of a command, in command order. Raw CLI runs print no status line.
+RUN_RE = re.compile(r"(?P<wrap>codex|gemini)-worker\.sh[\"']?\s+--mode"
+                    r"|(?:^|[;&|(]\s*)(?:(?P<rawc>codex)\s+exec\b|(?P<rawg>agy)\s+-)")
+FAILED = ("fail", "timeout", "unavailable")
 
 
 def is_prompt(d):
@@ -94,6 +105,68 @@ def route_of(calls):
     if ws == {"codex", "gemini"}:
         return "PARALLEL"
     return "CODEX" if "codex" in ws else "GEMINI"
+
+
+def result_text(c):
+    """Text of a tool_result block, whether its content is a string or a list of blocks."""
+    x = c.get("content")
+    if isinstance(x, list):
+        return "\n".join(str(b.get("text", "")) for b in x if isinstance(b, dict))
+    return str(x or "")
+
+
+def assign_status(runs, text):
+    """Give each wrapper run of one command its status line from the tool result.
+
+    Lines are matched to runs of the same worker in order only when the counts agree. One
+    run with several candidate lines takes the last one: stderr follows the model's answer.
+    Any other mismatch leaves the runs UNKNOWN rather than guessing which run printed what.
+    """
+    found = STATUS_RE.findall(text)
+    for w in ("codex", "gemini"):
+        mine = [r for r in runs if r["w"] == w and not r["raw"]]
+        lines = [f for f in found if f[0] == w]
+        if len(mine) == 1 and lines:
+            lines = lines[-1:]
+        if len(lines) != len(mine):
+            continue
+        for r, f in zip(mine, lines):
+            r["st"] = f[1]
+            r["tok"] = None if f[2] == "unavailable" else {
+                k: int(v) for k, v in (x.split(":") for x in f[2].split(","))}
+
+
+def worker_stats(calls):
+    """Per-worker outcomes, retries and fallbacks from ordered worker runs.
+
+    calls: [{"w": worker, "st": status or None, "tok": token dict or None, "turn": i or None}]
+    A retry is a run that follows a failed run of the same worker in the same prompt turn.
+    A fallback to Claude is a turn whose last worker run failed: Claude finished the task.
+    """
+    out = {w: {"ok": 0, "fail": 0, "timeout": 0, "unavailable": 0, "unknown": 0,
+               "tokens": None, "tok_runs": 0, "runs": 0} for w in ("codex", "gemini")}
+    for c in calls:
+        o = out[c["w"]]
+        o["runs"] += 1
+        o[c["st"] or "unknown"] += 1
+        if c["tok"]:
+            o["tok_runs"] += 1
+            o["tokens"] = {k: (o["tokens"] or {}).get(k, 0) + v for k, v in c["tok"].items()}
+    retry = fallback = 0
+    turns = {}
+    for c in calls:
+        if c["turn"] is not None:
+            turns.setdefault(c["turn"], []).append(c)
+    for runs in turns.values():
+        failed = set()
+        for c in runs:
+            if c["w"] in failed:
+                retry += 1
+            if c["st"] in FAILED:
+                failed.add(c["w"])
+        if runs[-1]["st"] in FAILED:
+            fallback += 1
+    return dict(out, retry=retry, fallback=fallback)
 
 
 def price_key(model):
@@ -124,6 +197,7 @@ def load(path):
     tools, skills = {}, {}
     codex = gemini = jev = 0
     turns = []  # worker calls per prompt of the main transcript, for route telemetry
+    calls, pending = [], {}  # worker runs in order; tool_use id -> its runs awaiting a result
     for main, line in read_lines(path):
         try:
             d = json.loads(line)
@@ -135,6 +209,10 @@ def load(path):
         if ts:  # min/max: subagent files are read after the main one
             first = min(first or ts, ts)
             last = max(last or ts, ts)
+        if d.get("type") == "user" and isinstance((d.get("message") or {}).get("content"), list):
+            for c in d["message"]["content"]:
+                if isinstance(c, dict) and c.get("type") == "tool_result" and c.get("tool_use_id") in pending:
+                    assign_status(pending.pop(c["tool_use_id"]), result_text(c))
         if d.get("type") != "assistant":
             continue
         m = d.get("message") or {}
@@ -156,14 +234,23 @@ def load(path):
                 jev += 1
             elif name == "Bash":
                 cmd = str(inp.get("command", ""))
-                codex += len(CODEX_RE.findall(cmd))
-                gemini += len(GEMINI_RE.findall(cmd))
+                nc, ng = len(CODEX_RE.findall(cmd)), len(GEMINI_RE.findall(cmd))
+                codex += nc
+                gemini += ng
+                turn = len(turns) - 1 if main and turns else None
+                runs = [{"w": m.group("wrap") or ("codex" if m.group("rawc") else "gemini"),
+                         "raw": not m.group("wrap"), "st": None, "tok": None, "turn": turn}
+                        for m in RUN_RE.finditer(cmd)]
+                if runs:
+                    calls += runs
+                    pending[c.get("id")] = runs
                 if turns:
                     turns[-1] += WORKER_MODE_RE.findall(cmd)
     routes = dict.fromkeys(ROUTES, 0)
     for t in turns:
         routes[route_of(t)] += 1
-    return list(msgs.values()), first, last, tools, skills, codex, gemini, jev, routes
+    return (list(msgs.values()), first, last, tools, skills, codex, gemini, jev, routes,
+            worker_stats(calls))
 
 
 def cost_parts(m):
@@ -226,7 +313,7 @@ def summarize(path):
 
     Counts and names of models, tools and skills only: no prompt, reply, path or code.
     """
-    msgs, first, last, tools, skills, codex, gemini, jev, routes = load(path)
+    msgs, first, last, tools, skills, codex, gemini, jev, routes, workers = load(path)
     models, bill = {}, {}
     tin = tout = cr = cw = 0
     equiv, unpriced = 0.0, set()
@@ -271,7 +358,46 @@ def summarize(path):
     return {"models": models, "tin": tin, "tout": tout, "cr": cr, "cw": cw,
             "equiv": equiv, "unpriced": unpriced, "dur": dur, "metered": metered,
             "real": real, "secs": secs, "tool_counts": tool_counts, "skills": skills,
-            "codex": codex, "gemini": gemini, "jev": jev, "routes": routes, "bill": bill}
+            "codex": codex, "gemini": gemini, "jev": jev, "routes": routes, "bill": bill,
+            "workers": workers}
+
+
+def worker_outcome(o):
+    """'2 OK / 1 FAIL', only the non-zero parts. unavailable (exit 4) counts as FAIL."""
+    parts = [(o["ok"], "OK"), (o["fail"] + o["unavailable"], "FAIL"), (o["timeout"], "TIMEOUT"),
+             (o["unknown"], "UNKNOWN")]
+    parts = [(n, lab) for n, lab in parts if n]
+    txt = " / ".join(f"{n} {lab}" for n, lab in parts)
+    if len(txt) > W - 12:  # keep the worker name readable on the 40-column ticket
+        short = {"TIMEOUT": "T/O", "UNKNOWN": "UNK"}
+        txt = "/".join(f"{n} {short.get(lab, lab)}" for n, lab in parts)
+    return txt or "0"
+
+
+def worker_problems(st):
+    """Short list of what went wrong with workers, empty when every run succeeded."""
+    ws = st.get("workers") or {}
+    out = []
+    for w, name in (("codex", "Codex"), ("gemini", "Gemini")):
+        o = ws.get(w) or {}
+        bad = [(o.get("fail", 0) + o.get("unavailable", 0), "FAIL"), (o.get("timeout", 0), "TIMEOUT")]
+        bad = [f"{n} {lab}" for n, lab in bad if n]
+        if bad:
+            out.append(f"{name} " + "/".join(bad))
+    if ws.get("retry"):
+        out.append(f"{ws['retry']} retry")
+    if ws.get("fallback"):
+        out.append("fallback Claude" + (f" x{ws['fallback']}" if ws["fallback"] > 1 else ""))
+    return out
+
+
+def worker_tokens(o):
+    """Token line as reported by the worker, never estimated."""
+    t = o.get("tokens")
+    if not t:
+        return "unavailable"
+    txt = f"{tg_compact(t['in'])} in/{tg_compact(t['out'] + t['think'])} out"
+    return txt + (" (partiel)" if o["tok_runs"] < o["runs"] else "")
 
 
 ROUTE_LABELS = (("DIRECT", "DIRECT"), ("CODEX", "CODEX"), ("GEMINI", "GEMINI"),
@@ -300,11 +426,18 @@ def render(path, session_id="", reason="", st=None):
     L.append(row("Skills", sum(skills.values())))
     for n, c in sorted(skills.items(), key=lambda x: -x[1])[:3]:
         L.append(row("  " + n.split(":")[-1], f"x{c}"))
-    L += [row("Codex", f"{codex} deleg." if codex else "0"),
-          row("Gemini", f"{gemini} deleg." if gemini else "0"),
-          row("Jev", f"{jev} appels" if jev else "0")]
-    if codex or gemini:
-        L.append(row("  quota Codex/Gemini", "non mesure"))
+    ws = st.get("workers") or {}
+    L += [sep, "WORKERS",
+          row("  Codex", worker_outcome(ws["codex"]) if codex else "0"),
+          row("  Gemini", worker_outcome(ws["gemini"]) if gemini else "0"),
+          row("  Jev", f"{jev} appels" if jev else "0")]
+    if ws.get("retry"):
+        L.append(row("  RETRY", ws["retry"]))
+    if ws.get("fallback"):
+        L.append(row("  FALLBACK", "CLAUDE" + (f" x{ws['fallback']}" if ws["fallback"] > 1 else "")))
+    for w, name, n in (("codex", "Codex", codex), ("gemini", "Gemini", gemini)):
+        if n:
+            L.append(row(f"  tok {name}", worker_tokens(ws[w])))
     routes = st.get("routes") or {}
     if any(routes.values()):
         L += [sep, "ROUTING"]
@@ -404,6 +537,9 @@ def telegram_text(st, session_id=""):
 
     L = ["<b>🤖 Claude Orchestrator</b>",
          f"<i>Session terminée · {datetime.now().strftime('%d/%m · %H:%M')}</i>", ""]
+    problems = worker_problems(st)
+    if problems:  # first thing read on the phone
+        L += ["🔴 <b>Workers : " + e(" · ".join(problems)) + "</b>", ""]
     if simple:
         L += [f"🧠 {mline} · ⏱ {tg_duration(st['secs'])} · 🔄 {reqs} req",
               f"📊 {tg_compact(total)} tokens · 🛠 {tools} outils",
@@ -426,9 +562,13 @@ def telegram_text(st, session_id=""):
         if workers:
             def plural(n, word):
                 return f"{n} {word}{'s' if n > 1 else ''}"
+            ws = st.get("workers") or {}
+
+            def outcome(w):
+                return worker_outcome(ws[w]) if st[w] and w in ws else plural(st[w], "délégation")
             orch = ["Claude → principal",
-                    f"Codex  → {plural(st['codex'], 'délégation')}",
-                    f"Gemini → {plural(st['gemini'], 'délégation')}",
+                    f"Codex  → {outcome('codex')}",
+                    f"Gemini → {outcome('gemini')}",
                     f"Jev    → {plural(st['jev'], 'appel')}"]
             L += ["", "<b>🧭 Orchestration</b>", "<pre>" + e("\n".join(orch)) + "</pre>"]
         else:
@@ -532,7 +672,7 @@ def interactive_exit(data, path):
 
 def telegram_payload(st, session_id=""):
     """What the detached child receives: the metrics already computed, no transcript."""
-    m = dict(st, unpriced=sorted(st["unpriced"]))
+    m = dict(st, unpriced=sorted(st["unpriced"]), worker_problems=worker_problems(st))
     return json.dumps({"text": telegram_text(st, session_id), "metrics": m,
                        "sid": session_id or "", "when": datetime.now().isoformat()})
 

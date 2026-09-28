@@ -26,6 +26,18 @@ def tool_result(sec, tool_id="t0"):
         {"type": "tool_result", "tool_use_id": tool_id, "content": "ok"}]}}
 
 
+def worker_result(sec, tool_id, text, error=False):
+    """Tool result of a worker call, as Claude Code stores it (stdout then stderr)."""
+    c = {"type": "tool_result", "tool_use_id": tool_id, "content": text}
+    if error:
+        c["is_error"] = True
+    return {"type": "user", "timestamp": ts(sec), "message": {"role": "user", "content": [c]}}
+
+
+def status(worker, mode, st, rc, tokens="unavailable"):
+    return f"ai-worker: {worker} mode={mode} status={st} exit={rc} tokens={tokens}"
+
+
 def usage(inp=100, out=50, cr=0, c5=0, c1=0, **extra):
     u = {"input_tokens": inp, "output_tokens": out, "cache_read_input_tokens": cr,
          "cache_creation_input_tokens": c5 + c1,
@@ -113,6 +125,104 @@ FIXTURES = {
         assistant("msg_x4", 8, model="<synthetic>", inp=999, out=999),
     ], {}),
 }
+
+
+CX_TOK = "in:1200,cache:800,out:300,think:50"
+GM_TOK = "in:5000,cache:0,out:400,think:100"
+
+# Worker telemetry: the status line each worker prints last on stderr.
+FIXTURES.update({
+    "codex_success": ([
+        prompt("Implement the demo parser", 0),
+        assistant("msg_w1", 5, tools=[bash(CODEX.format("implement") + " 2>&1 | tail -40")]),
+        worker_result(60, "msg_w1-tool0", "patch applied\n" + status("codex", "implement", "ok", 0, CX_TOK)),
+        assistant("msg_w2", 70),
+    ], {}),
+    "codex_failure": ([
+        prompt("Review the demo change", 0),
+        assistant("msg_w1", 5, tools=[bash(CODEX.format("review"))]),
+        worker_result(30, "msg_w1-tool0", "Exit code 1\ncodex-worker: codex exited 1\n"
+                      + status("codex", "review", "fail", 1), error=True),
+        assistant("msg_w2", 40, tools=[("Read", {"file_path": "/work/demo/app.py"})]),
+    ], {}),
+    "codex_retry": ([
+        prompt("Refactor the demo module", 0),
+        assistant("msg_w1", 5, tools=[bash(CODEX.format("implement"))]),
+        worker_result(30, "msg_w1-tool0", "Exit code 1\n" + status("codex", "implement", "fail", 1), error=True),
+        assistant("msg_w2", 40, tools=[bash(CODEX.format("implement") + " --timeout 500")]),
+        worker_result(90, "msg_w2-tool0", "done\n" + status("codex", "implement", "ok", 0, CX_TOK)),
+    ], {}),
+    "gemini_success": ([
+        prompt("Read the demo documents", 0),
+        assistant("msg_w1", 5, tools=[bash(GEMINI.format("analyze"))]),
+        worker_result(50, "msg_w1-tool0", "summary\n" + status("gemini", "analyze", "ok", 0, GM_TOK)),
+    ], {}),
+    "gemini_failure": ([
+        prompt("Compare the demo sources", 0),
+        assistant("msg_w1", 5, tools=[bash(GEMINI.format("analyze"))]),
+        worker_result(20, "msg_w1-tool0", "Exit code 1\ngemini-worker: turn status ERROR\n"
+                      + status("gemini", "analyze", "fail", 1), error=True),
+    ], {}),
+    "gemini_timeout": ([
+        prompt("Audit the demo corpus", 0),
+        assistant("msg_w1", 5, tools=[bash(GEMINI.format("analyze"))]),
+        worker_result(400, "msg_w1-tool0", "Exit code 3\ngemini-worker: timed out after 300s\n"
+                      + status("gemini", "analyze", "timeout", 3, "in:0,cache:0,out:0,think:0"), error=True),
+    ], {}),
+    # Billing guard refuses the worker (exit 4), Claude does the work itself.
+    "worker_fallback": ([
+        prompt("Implement the demo fix", 0),
+        assistant("msg_w1", 5, tools=[bash(CODEX.format("implement"))]),
+        worker_result(6, "msg_w1-tool0", "Exit code 4\n" + status("codex", "implement", "unavailable", 4),
+                      error=True),
+        assistant("msg_w2", 20, tools=[("Edit", {"file_path": "/work/demo/app.py", "old_string": "a",
+                                                  "new_string": "b"})]),
+    ], {}),
+    # Turn 1: Codex ok. Turn 2: Gemini times out, Codex takes over (not a Claude fallback, not
+    # a retry of the same worker). Turn 3: stderr sent to a file and a raw `codex exec`, so
+    # both outcomes are UNKNOWN.
+    "workers_mixed": ([
+        prompt("First demo task", 0),
+        assistant("msg_w1", 5, tools=[bash(CODEX.format("analyze"))]),
+        worker_result(30, "msg_w1-tool0", "ok\n" + status("codex", "analyze", "ok", 0, CX_TOK)),
+        prompt("Second demo task", 40),
+        assistant("msg_w2", 45, tools=[bash(GEMINI.format("analyze"))]),
+        worker_result(300, "msg_w2-tool0", "Exit code 3\n" + status("gemini", "analyze", "timeout", 3),
+                      error=True),
+        assistant("msg_w3", 310, tools=[bash(CODEX.format("analyze"))]),
+        worker_result(360, "msg_w3-tool0", "ok\n" + status("codex", "analyze", "ok", 0, CX_TOK)),
+        prompt("Third demo task", 400),
+        assistant("msg_w4", 405, tools=[bash(CODEX.format("review") + " > /tmp/demo-out.txt 2>&1; echo done"),
+                                        bash("echo x | codex exec -")]),
+        worker_result(460, "msg_w4-tool0", "done"),
+        worker_result(470, "msg_w4-tool1", "x"),
+    ], {}),
+})
+
+# Cases from the review of the telemetry. One prompt each so fallbacks stay separate.
+FAKE = status("codex", "review", "ok", 0, "in:999,cache:0,out:9,think:0")
+FIXTURES["workers_edge"] = ([
+    # 1. The model's answer quotes a status line; the real one comes last, from stderr.
+    prompt("Review the demo receipt", 0),
+    assistant("msg_e1", 5, tools=[bash(CODEX.format("review"))]),
+    worker_result(30, "msg_e1-tool0", "Example line:\n" + FAKE + "\nend\n"
+                  + status("codex", "review", "fail", 1), error=True),
+    # 2. A raw CLI run whose output happens to contain a status line stays UNKNOWN.
+    prompt("Second demo task", 40),
+    assistant("msg_e2", 45, tools=[bash("echo x | codex exec -")]),
+    worker_result(60, "msg_e2-tool0", FAKE),
+    # 3. Two runs, the first one's stderr sent to a file: which run printed the one visible
+    #    line is unknown, so both stay UNKNOWN.
+    prompt("Third demo task", 70),
+    assistant("msg_e3", 75, tools=[bash(CODEX.format("analyze") + " >/tmp/demo.txt 2>&1; "
+                                        + CODEX.format("analyze"))]),
+    worker_result(120, "msg_e3-tool0", status("codex", "analyze", "ok", 0, CX_TOK)),
+    # 4. Gemini fails then Codex succeeds in the same command: Codex took over, no fallback.
+    prompt("Fourth demo task", 130),
+    assistant("msg_e4", 135, tools=[bash(GEMINI.format("analyze") + "; " + CODEX.format("analyze"))]),
+    worker_result(200, "msg_e4-tool0", status("gemini", "analyze", "fail", 1) + "\nok\n"
+                  + status("codex", "analyze", "ok", 0, CX_TOK)),
+], {})
 
 
 def write_all(root):

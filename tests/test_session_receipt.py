@@ -152,6 +152,79 @@ class ReceiptTest(unittest.TestCase):
         self.assertIn("Jev", sr.telegram_text(st, SID))
         self.assertIn("OUI", sr.render(self.paths["mixed"], SID, st=st))
 
+    # --- worker telemetry -----------------------------------------------------------------
+    def w(self, name):
+        return self.st(name)["workers"]
+
+    def outcome(self, name, worker):
+        o = self.w(name)[worker]
+        return {k: o[k] for k in ("ok", "fail", "timeout", "unavailable", "unknown") if o[k]}
+
+    def test_codex_success(self):
+        ws = self.w("codex_success")
+        self.assertEqual(self.outcome("codex_success", "codex"), {"ok": 1})
+        self.assertEqual(ws["codex"]["tokens"], {"in": 1200, "cache": 800, "out": 300, "think": 50})
+        self.assertEqual((ws["retry"], ws["fallback"]), (0, 0))
+
+    def test_codex_failure_falls_back_to_claude(self):
+        ws = self.w("codex_failure")
+        self.assertEqual(self.outcome("codex_failure", "codex"), {"fail": 1})
+        self.assertIsNone(ws["codex"]["tokens"])
+        self.assertEqual((ws["retry"], ws["fallback"]), (0, 1))
+
+    def test_codex_retry_then_success(self):
+        ws = self.w("codex_retry")
+        self.assertEqual(self.outcome("codex_retry", "codex"), {"ok": 1, "fail": 1})
+        self.assertEqual((ws["retry"], ws["fallback"]), (1, 0))
+
+    def test_gemini_success(self):
+        ws = self.w("gemini_success")
+        self.assertEqual(self.outcome("gemini_success", "gemini"), {"ok": 1})
+        self.assertEqual(ws["gemini"]["tokens"], {"in": 5000, "cache": 0, "out": 400, "think": 100})
+
+    def test_gemini_failure_and_timeout(self):
+        self.assertEqual(self.outcome("gemini_failure", "gemini"), {"fail": 1})
+        self.assertEqual(self.outcome("gemini_timeout", "gemini"), {"timeout": 1})
+        self.assertEqual(self.w("gemini_timeout")["fallback"], 1)
+
+    def test_unavailable_worker_falls_back_to_claude(self):
+        ws = self.w("worker_fallback")
+        self.assertEqual(self.outcome("worker_fallback", "codex"), {"unavailable": 1})
+        self.assertEqual(ws["fallback"], 1)
+        self.assertIn("1 FAIL", sr.render(self.paths["worker_fallback"], SID))
+
+    def test_mixed_workers(self):
+        ws = self.w("workers_mixed")
+        self.assertEqual(self.outcome("workers_mixed", "codex"), {"ok": 2, "unknown": 2})
+        self.assertEqual(self.outcome("workers_mixed", "gemini"), {"timeout": 1})
+        self.assertEqual((ws["retry"], ws["fallback"]), (0, 0))
+        self.assertEqual(ws["codex"]["tokens"]["in"], 2400)
+        self.assertIn("(partiel)", sr.render(self.paths["workers_mixed"], SID))
+
+    def test_review_edge_cases(self):
+        ws = self.w("workers_edge")
+        # 1: last line wins (fail); 2: raw run unknown; 3: two runs, one line: both unknown;
+        # 4: codex ok after gemini fail.
+        self.assertEqual(self.outcome("workers_edge", "codex"), {"ok": 1, "fail": 1, "unknown": 3})
+        self.assertEqual(self.outcome("workers_edge", "gemini"), {"fail": 1})
+        self.assertEqual(ws["fallback"], 1)  # only case 1
+        self.assertEqual(ws["codex"]["tokens"]["in"], 1200)  # the quoted 999 is never counted
+
+    def test_no_status_line_means_unknown(self):
+        self.assertEqual(self.outcome("codex", "codex"), {"unknown": 1})
+        self.assertEqual(self.w("codex")["fallback"], 0)
+
+    def test_quiet_session_shows_no_incident(self):
+        self.assertEqual(sr.worker_problems(self.st("codex_success")), [])
+        self.assertNotIn("🔴", sr.telegram_text(self.st("codex_success"), SID))
+        self.assertNotIn("🔴", sr.telegram_text(self.st("direct"), SID))
+
+    def test_failure_is_first_on_telegram(self):
+        text = sr.telegram_text(self.st("codex_failure"), SID)
+        first = text.split("\n")[3]
+        self.assertIn("Codex 1 FAIL", first)
+        self.assertIn("fallback Claude", first)
+
     # --- Telegram payload -----------------------------------------------------------------
     def test_payload_carries_no_content(self):
         payload = sr.telegram_payload(self.st("mixed"), SID)

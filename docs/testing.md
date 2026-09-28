@@ -12,7 +12,7 @@ No network, no model call, no dependency to install. Runs in under a second.
 
 | File | Covers |
 |---|---|
-| `tests/test_session_receipt.py` | Transcript parsing, route detection, token and cache totals, API equivalent, billing classification, Telegram payload privacy, snapshots |
+| `tests/test_session_receipt.py` | Transcript parsing, route detection, token and cache totals, API equivalent, billing classification, worker outcomes, Telegram payload privacy, snapshots |
 | `tests/test_repeat_tool_guard.py` | Thresholds 3, 5, 8, no false alarm on changing arguments, normalization, exemptions, polling prompts, resets, bounded state, fail open, kill switch |
 
 Receipt checks, one fixture each where it applies:
@@ -29,11 +29,15 @@ Receipt checks, one fixture each where it applies:
 - **Telegram:** the payload carries no prompt, path, reply or command; headless sessions and
   `/clear` send nothing.
 
-Worker failure detection is not tested: the receipt does not record worker failures yet.
+- **Workers:** Codex success, failure, retry then success; Gemini success, failure, timeout;
+  billing guard refusal then Claude fallback; a mixed session with a Gemini timeout taken
+  over by Codex; UNKNOWN when the status line is missing; a status line quoted in a model's
+  answer, a raw CLI run, two runs with one line, and command order. Normal sessions show no
+  incident; a failure is the first line of the Telegram text.
 
 ## Fixtures
 
-`tests/fixtures.py` builds seven synthetic transcripts in code and writes them to a
+`tests/fixtures.py` builds sixteen synthetic transcripts in code and writes them to a
 temporary directory at test time. Every prompt, path and id is invented. No `.jsonl` file is
 committed (the repository ignores `*.jsonl`), and no real transcript is ever used.
 

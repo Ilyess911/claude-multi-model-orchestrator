@@ -73,5 +73,29 @@
   "mcp__jev__jev_check": 1
  },
  "tout": 250,
- "unpriced": []
+ "unpriced": [],
+ "workers": {
+  "codex": {
+   "fail": 0,
+   "ok": 0,
+   "runs": 2,
+   "timeout": 0,
+   "tok_runs": 0,
+   "tokens": null,
+   "unavailable": 0,
+   "unknown": 2
+  },
+  "fallback": 0,
+  "gemini": {
+   "fail": 0,
+   "ok": 0,
+   "runs": 0,
+   "timeout": 0,
+   "tok_runs": 0,
+   "tokens": null,
+   "unavailable": 0,
+   "unknown": 0
+  },
+  "retry": 0
+ }
 }

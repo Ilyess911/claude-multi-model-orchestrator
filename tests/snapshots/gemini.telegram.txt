@@ -20,7 +20,7 @@ Facturé    $0.00</pre>
 <b>🧭 Orchestration</b>
 <pre>Claude → principal
 Codex  → 0 délégation
-Gemini → 1 délégation
+Gemini → 1 UNKNOWN
 Jev    → 0 appel</pre>
 
 <b>🔀 Routing</b>

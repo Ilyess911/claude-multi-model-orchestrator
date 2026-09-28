@@ -14,9 +14,11 @@ TOTAL TOKENS                   3 100 070
 ----------------------------------------
 Outils                          0 appels
 Skills                                 0
-Codex                                  0
-Gemini                                 0
-Jev                                    0
+----------------------------------------
+WORKERS
+  Codex                                0
+  Gemini                               0
+  Jev                                  0
 ----------------------------------------
 ROUTING
   DIRECT                               1

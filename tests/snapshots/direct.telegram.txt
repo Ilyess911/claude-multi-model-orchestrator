@@ -1,0 +1,30 @@
+<b>🤖 Claude Orchestrator</b>
+<i>Session terminée · <now></i>
+
+🧠 Opus 5.5
+⏱ 1 min · 🔄 2 requêtes
+
+<pre>TOKENS
+Input       1 010
+Output        240
+Cache      11 300
+Total      12 550
+
+COÛT
+Équiv. API  $0.01
+Facturé     $0.00</pre>
+
+🛠 2 appels outils
+🧩 demo-skill ×1
+🧭 Claude only
+
+<b>🔀 Routing</b>
+<pre>DIRECT         1
+CODEX          0
+GEMINI         0
+CROSS REVIEW   0
+PARALLEL       0</pre>
+
+🟢 Aucun coût supplémentaire
+
+🧾 <code>ticket fixture0</code> · #ClaudeCode

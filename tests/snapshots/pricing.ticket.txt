@@ -1,0 +1,40 @@
+========================================
+          CLAUDE ORCHESTRATOR
+           ticket de session
+         <now>
+========================================
+Opus 5.5                           2 req
+demo-model-unknown                 1 req
+----------------------------------------
+Input                          2 000 010
+Output                           100 060
+Cache lecture                          0
+Cache ecriture                 1 000 000
+TOTAL TOKENS                   3 100 070
+----------------------------------------
+Outils                          0 appels
+Skills                                 0
+Codex                                  0
+Gemini                                 0
+Jev                                    0
+----------------------------------------
+ROUTING
+  DIRECT                               1
+  CODEX                                0
+  GEMINI                               0
+  CROSS REVIEW                         0
+  PARALLEL                             0
+----------------------------------------
+Duree                             0min08
+----------------------------------------
+EQUIVALENT API                   25.23 $
+COUT REEL FACTURE                 0.00 $
+  Claude                  abonnement Max
+  Codex/Gemini                abonnement
+  sans tarif          demo-model-unknown
+FACTURATION SUPPL.                aucune
+========================================
+         merci de votre visite
+    │▍▐║  ▎▏│▍▐║█▌▎▏│▍▐║█ ▎▏│▍▐ █▌  │▍
+  fixture0-0000-0000-0000-000000000000
+

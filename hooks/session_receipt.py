@@ -110,15 +110,21 @@ def files_for(path):
     return [path] + sorted(glob.glob(os.path.join(path[:-6], "subagents", "*.jsonl")))
 
 
+def read_lines(path):
+    """(is_main_transcript, line) for the main transcript, then each subagent file."""
+    for f in files_for(path):
+        with open(f, encoding="utf-8", errors="replace") as fh:
+            for line in fh:
+                yield f == path, line
+
+
 def load(path):
     """Assistant messages deduplicated by message id (streaming writes one line per block)."""
     msgs, first, last = {}, None, None
     tools, skills = {}, {}
     codex = gemini = jev = 0
     turns = []  # worker calls per prompt of the main transcript, for route telemetry
-    lines = ((f == path, l) for f in files_for(path)
-             for l in open(f, encoding="utf-8", errors="replace"))
-    for main, line in lines:
+    for main, line in read_lines(path):
         try:
             d = json.loads(line)
         except ValueError:
@@ -126,9 +132,9 @@ def load(path):
         if main and is_prompt(d):
             turns.append([])
         ts = d.get("timestamp")
-        if ts:
-            first = first or ts
-            last = ts
+        if ts:  # min/max: subagent files are read after the main one
+            first = min(first or ts, ts)
+            last = max(last or ts, ts)
         if d.get("type") != "assistant":
             continue
         m = d.get("message") or {}

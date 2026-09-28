@@ -61,15 +61,57 @@ nothing and exits 0 rather than breaking the status line.
 
 ## PreToolUse hooks
 
-Both are Graphify guards declared in `~/.claude/settings.json` and both call the local CLI
-only. No model call, no network.
+Three guards declared in `~/.claude/settings.json`. All run locally. No model call, no network.
 
 | Matcher | Command | Role |
 |---|---|---|
 | `Bash` or `Grep` | `graphify hook-guard search` | Nudges toward a graph query before a broad blind search |
 | `Read` or `Glob` | `graphify hook-guard read` | Nudges toward a graph query before opening many unrelated files |
+| `*` | `~/.claude/hooks/repeat_tool_guard.py` | Catches the same tool called with the same arguments over and over |
 
-They guard, they do not block work: exit status is 0 in the normal case.
+The two Graphify guards only nudge: exit status is 0 in the normal case. The repeat guard
+is the one hook that can refuse a call, and only after eight identical calls in a row.
+
+### Repeat tool guard (`~/.claude/hooks/repeat_tool_guard.py`)
+
+Idea taken from the `repeat-tool-reminder` guard of DeepSeek Harness, reimplemented from
+scratch as a Claude Code hook. Source versioned in [`hooks/`](../hooks/repeat_tool_guard.py).
+Wired twice, timeout 5 s each: `PreToolUse` with matcher `*`, and `UserPromptSubmit`.
+
+A chain is a run of consecutive calls with the same tool and the same normalized arguments,
+counted per session and per agent (`agent_id` is set by Claude Code inside a subagent, so
+subagents never add to the main chain). Any different call breaks the chain.
+
+| Identical calls in a row | Effect |
+|---|---|
+| 1, 2 | Nothing |
+| 3 | `additionalContext` to Claude: « Tu répètes la même action. Vérifie si le résultat change réellement. » |
+| 5 | `additionalContext`: « Cette approche semble bloquée. Change de stratégie avant de rappeler cet outil. » |
+| 8 and more | `permissionDecision: deny` with the reason; Claude sees it as a refused call |
+
+Normalization: display-only fields (`description`, `statusMessage`) are dropped and keys are
+sorted. A Bash command also loses runs of spaces and a trailing `;`, which the shell ignores.
+Every other string is compared exactly, so a different file, offset, pattern, test input or
+timeout is a different call.
+
+Not counted, never blocked:
+
+- Pagination, other files, other test inputs, any argument that really changes.
+- Tools whose repetition is their purpose: `Monitor`, `ScheduleWakeup`, `TaskOutput`,
+  `TaskStop`, `TaskList`, `TaskGet`, `CronList`, `ListAgents`, `AskUserQuestion`, plan mode
+  tools, `TodoWrite`. They also break a chain.
+- A Bash command ending with `# repeat-ok`, a deliberate per-call exemption.
+- Polling the person asked for: when the last prompt contains a polling word (poll, surveille,
+  attends, wait, until, jusqu'à, toutes les, every N, boucle, loop, répète, retry, réessaie),
+  the guard still reminds and warns but never denies.
+
+Resets: every new prompt resets all chains of the session; a 30 minute pause breaks a chain.
+
+State: `~/.claude/state/repeat-guard/<session>.json`, a few hundred bytes (hash, count, time
+per agent). Never in a repository. Bounded three ways: at most 32 chains per file, files older
+than 24 h deleted, at most 200 files kept. One lock file for the directory serializes parallel
+tool calls. Fails open: invalid input, a full disk or any exception allows the call silently.
+Kill switch: `CLAUDE_REPEAT_GUARD=0` in the environment.
 
 ## SessionEnd hook: session receipt
 
@@ -233,4 +275,5 @@ switch. AST only, no model call. Log at `~/.cache/graphify-rebuild.log`.
 - No hook calls Codex, Gemini, Jev or any model API. The one outbound call is the
   best-effort Telegram copy of the session receipt, metadata only.
 - No hook writes to a work repository beyond the Graphify output directory.
-- No hook blocks a tool call outright.
+- No hook blocks a tool call outright, except the repeat guard after eight identical calls
+  in a row, and only when the last prompt did not ask for polling.

@@ -31,6 +31,7 @@ Read from the live machine on 2026-09-22. Paths are written with `~` for the hom
 │   └── gemini-worker.sh          bounded Gemini call through agy, read only
 ├── hooks/
 │   ├── graphify_session_start.py SessionStart graph freshness
+│   ├── repeat_tool_guard.py      PreToolUse + UserPromptSubmit: repeated identical calls
 │   ├── session_receipt.py        SessionEnd receipt: terminal ticket + Telegram copy
 │   └── receipt_png.py            thermal receipt PNG for Telegram (Pillow venv)
 ├── skills/

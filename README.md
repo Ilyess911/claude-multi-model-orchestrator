@@ -105,6 +105,7 @@ because no TypeSafe key exists in the Keychain. Nothing depends on it.
 | [docs/security.md](docs/security.md) | Secrets, privacy, repository safety, worker scoping |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | Failure modes and how each one degrades |
 | [docs/restore.md](docs/restore.md) | Rebuilding the architecture on another Mac |
+| [docs/testing.md](docs/testing.md) | Snapshot tests of the receipt and tests of the repeat guard |
 | [diagrams/architecture.md](diagrams/architecture.md) | Diagrams: routing, session start, billing guard |
 | [examples/routing-examples.md](examples/routing-examples.md) | Concrete tasks and the route each one takes |
 

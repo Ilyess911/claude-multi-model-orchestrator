@@ -1,0 +1,43 @@
+========================================
+          CLAUDE ORCHESTRATOR
+           ticket de session
+         <now>
+========================================
+Opus 5.5                           3 req
+Haiku 4.5                          1 req
+----------------------------------------
+Input                                800
+Output                               250
+Cache lecture                          0
+Cache ecriture                         0
+TOTAL TOKENS                       1 050
+----------------------------------------
+Outils                          3 appels
+  Bash                                x2
+  jev:jev_check                       x1
+Skills                                 0
+Codex                           2 deleg.
+Gemini                                 0
+Jev                             1 appels
+  quota Codex/Gemini          non mesure
+----------------------------------------
+ROUTING
+  DIRECT                               1
+  CODEX                                1
+  GEMINI                               0
+  CROSS REVIEW                         1
+  PARALLEL                             0
+----------------------------------------
+Duree                               1h00
+----------------------------------------
+EQUIVALENT API                    0.01 $
+COUT REEL FACTURE                 0.00 $
+  Claude                  abonnement Max
+  Codex/Gemini                abonnement
+FACTURATION SUPPL.                   OUI
+                                  Jev x1
+========================================
+         merci de votre visite
+    │▍▐║  ▎▏│▍▐║█▌▎▏│▍▐║█ ▎▏│▍▐ █▌  │▍
+  fixture0-0000-0000-0000-000000000000
+

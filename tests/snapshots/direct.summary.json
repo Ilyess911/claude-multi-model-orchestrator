@@ -1,0 +1,56 @@
+{
+ "bill": {
+  "claude-opus-5-5": {
+   "cr": [
+    11000,
+    0.0022
+   ],
+   "cw": [
+    300,
+    0.0015
+   ],
+   "in": [
+    1010,
+    0.00404
+   ],
+   "out": [
+    240,
+    0.0048
+   ],
+   "web": [
+    0,
+    0.0
+   ]
+  }
+ },
+ "codex": 0,
+ "cr": 11000,
+ "cw": 300,
+ "dur": "1min05",
+ "equiv": 0.01254,
+ "gemini": 0,
+ "jev": 0,
+ "metered": false,
+ "models": {
+  "claude-opus-5-5": 2
+ },
+ "real": 0.0,
+ "routes": {
+  "CODEX": 0,
+  "DIRECT": 1,
+  "GEMINI": 0,
+  "PARALLEL": 0,
+  "REVIEW": 0
+ },
+ "secs": 65,
+ "skills": {
+  "demo-skill": 1
+ },
+ "tin": 1010,
+ "tool_counts": {
+  "Read": 1,
+  "Skill": 1
+ },
+ "tout": 240,
+ "unpriced": []
+}

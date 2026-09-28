@@ -1,0 +1,76 @@
+{
+ "bill": {
+  "claude-opus-5-5": {
+   "cr": [
+    0,
+    0.0
+   ],
+   "cw": [
+    1000000,
+    8.8
+   ],
+   "in": [
+    2000000,
+    12.4
+   ],
+   "out": [
+    100050,
+    4.0011
+   ],
+   "web": [
+    3,
+    0.03
+   ]
+  },
+  "demo-model-unknown": {
+   "cr": [
+    0,
+    0.0
+   ],
+   "cw": [
+    0,
+    0.0
+   ],
+   "in": [
+    10,
+    0.0
+   ],
+   "out": [
+    10,
+    0.0
+   ],
+   "web": [
+    0,
+    0.0
+   ]
+  }
+ },
+ "codex": 0,
+ "cr": 0,
+ "cw": 1000000,
+ "dur": "0min08",
+ "equiv": 25.2311,
+ "gemini": 0,
+ "jev": 0,
+ "metered": false,
+ "models": {
+  "claude-opus-5-5": 2,
+  "demo-model-unknown": 1
+ },
+ "real": 0.0,
+ "routes": {
+  "CODEX": 0,
+  "DIRECT": 1,
+  "GEMINI": 0,
+  "PARALLEL": 0,
+  "REVIEW": 0
+ },
+ "secs": 8,
+ "skills": {},
+ "tin": 2000010,
+ "tool_counts": {},
+ "tout": 100060,
+ "unpriced": [
+  "demo-model-unknown"
+ ]
+}

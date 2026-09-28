@@ -1,0 +1,10 @@
+<b>🤖 Claude Orchestrator</b>
+<i>Session terminée · <now></i>
+
+🧠 Opus 5.5 ×2 · demo-model-unknown ×1 · ⏱ 8 s · 🔄 3 req
+📊 3,1 M tokens · 🛠 0 outils
+💰 Équiv. API $25.23 · Facturé <b>$0.00</b>
+
+🟢 Aucun coût supplémentaire
+
+🧾 <code>ticket fixture0</code> · #ClaudeCode

@@ -1,0 +1,77 @@
+{
+ "bill": {
+  "claude-haiku-4-5": {
+   "cr": [
+    0,
+    0.0
+   ],
+   "cw": [
+    0,
+    0.0
+   ],
+   "in": [
+    500,
+    0.0005
+   ],
+   "out": [
+    100,
+    0.0005
+   ],
+   "web": [
+    0,
+    0.0
+   ]
+  },
+  "claude-opus-5-5": {
+   "cr": [
+    0,
+    0.0
+   ],
+   "cw": [
+    0,
+    0.0
+   ],
+   "in": [
+    300,
+    0.0012
+   ],
+   "out": [
+    150,
+    0.003
+   ],
+   "web": [
+    0,
+    0.0
+   ]
+  }
+ },
+ "codex": 2,
+ "cr": 0,
+ "cw": 0,
+ "dur": "1h00",
+ "equiv": 0.0052,
+ "gemini": 0,
+ "jev": 1,
+ "metered": false,
+ "models": {
+  "claude-haiku-4-5": 1,
+  "claude-opus-5-5": 3
+ },
+ "real": 0.0,
+ "routes": {
+  "CODEX": 1,
+  "DIRECT": 1,
+  "GEMINI": 0,
+  "PARALLEL": 0,
+  "REVIEW": 1
+ },
+ "secs": 3600,
+ "skills": {},
+ "tin": 800,
+ "tool_counts": {
+  "Bash": 2,
+  "mcp__jev__jev_check": 1
+ },
+ "tout": 250,
+ "unpriced": []
+}

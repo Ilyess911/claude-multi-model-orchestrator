@@ -31,6 +31,10 @@ Rule in all cases: **a worker failing never blocks the task.** Claude finishes i
 - No bouncing a subtask between workers.
 - If the same failure appears three turns in a row, the rule is to stop iterating on code and
   name the assumption that might be wrong instead.
+- Tool level: the repeat guard reminds at 3 identical calls in a row, warns at 5 and refuses
+  from 8 ([hooks.md](hooks.md#repeat-tool-guard-claudehooksrepeat_tool_guardpy)). A refused
+  legitimate call means: change an argument, use `Monitor` or `ScheduleWakeup` for polling,
+  end the Bash command with `# repeat-ok`, or set `CLAUDE_REPEAT_GUARD=0`.
 
 ## Graphify failures
 

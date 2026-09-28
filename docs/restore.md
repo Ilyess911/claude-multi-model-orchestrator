@@ -68,6 +68,10 @@ must reproduce.
   repository, create the Pillow venv, create the bot, store token and chat id in the Keychain, see
   [hooks.md](hooks.md#telegram-copy-of-the-receipt).
   Back up `settings.json` with a timestamp before editing it.
+- Copy `hooks/repeat_tool_guard.py` to `~/.claude/hooks/` and wire it twice with a 5 s
+  timeout: `PreToolUse` with matcher `*`, and `UserPromptSubmit`. Command:
+  `/usr/bin/env python3 "$HOME/.claude/hooks/repeat_tool_guard.py"`.
+- Run `python3 -m unittest` in this repository: every test must pass.
 - Per work repository: `graphify hook install`, and add `graphify-out/` to `.gitignore`.
 
 ## 5. Plugins

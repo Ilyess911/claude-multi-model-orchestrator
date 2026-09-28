@@ -595,14 +595,20 @@ VENV_PY = os.path.expanduser("~/.claude/venvs/session-receipt/bin/python")  # Pi
 TG_CAPTION = "Claude Orchestrator · Session complete"
 
 
-def tg_photo(token, chat, png, timeout=TG_TIMEOUT * 2):
-    """sendPhoto as multipart/form-data, standard library only."""
+def tg_photo(token, chat, png, timeout=None):
+    """sendPhoto as multipart/form-data, standard library only.
+
+    The write timeout follows the image size (floor 10 s, ~8 KB/s assumed, cap 120 s):
+    a phone hotspot can upload far slower than the fixed timeout allowed.
+    """
+    if timeout is None:
+        timeout = min(120, max(TG_TIMEOUT * 2, len(png) / 8192))
     b = "----receipt" + os.urandom(8).hex()
     parts = []
     for k, v in (("chat_id", chat), ("caption", TG_CAPTION)):
         parts.append(f'--{b}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode())
-    parts.append(f'--{b}\r\nContent-Disposition: form-data; name="photo"; filename="receipt.png"\r\n'
-                 f"Content-Type: image/png\r\n\r\n".encode() + png + b"\r\n")
+    parts.append(f'--{b}\r\nContent-Disposition: form-data; name="photo"; filename="receipt.jpg"\r\n'
+                 f"Content-Type: image/jpeg\r\n\r\n".encode() + png + b"\r\n")
     parts.append(f"--{b}--\r\n".encode())
     req = urllib.request.Request(f"https://api.telegram.org/bot{token}/sendPhoto", data=b"".join(parts),
                                  headers={"Content-Type": f"multipart/form-data; boundary={b}"})
@@ -700,12 +706,12 @@ def queue_flush():
 
 
 def receipt_png(payload):
-    """PNG bytes, or None when Pillow or the renderer is unavailable (text fallback)."""
+    """JPEG bytes for Telegram, or None when Pillow or the renderer is unavailable (text fallback)."""
     try:
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         import receipt_png as rp
         when = datetime.fromisoformat(payload["when"])
-        return rp.render_png(payload["metrics"], payload.get("sid", ""), when)
+        return rp.render_jpeg(payload["metrics"], payload.get("sid", ""), when)
     except Exception as err:
         log_error(f"png render failed: {type(err).__name__}")
         return None

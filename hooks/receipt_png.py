@@ -554,6 +554,13 @@ def render_png(st, session_id="", when=None):
     return buf.getvalue()
 
 
+def render_jpeg(st, session_id="", when=None, quality=85):
+    """Telegram copy: ~200 KB instead of ~1.5 MB, so a slow hotspot uploads it in time."""
+    buf = io.BytesIO()
+    build(st, session_id, when).convert("RGB").save(buf, "JPEG", quality=quality, optimize=True)
+    return buf.getvalue()
+
+
 if __name__ == "__main__":
     st = json.load(open(sys.argv[1]))
     with open(sys.argv[2], "wb") as f:

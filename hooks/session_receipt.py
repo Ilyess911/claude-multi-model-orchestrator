@@ -649,6 +649,7 @@ def telegram_send(text, png=None):
 QUEUE_DIR = os.path.expanduser("~/.claude/state/receipt-queue")
 QUEUE_MAX = 20            # oldest dropped beyond this
 QUEUE_TTL = 7 * 86400     # a week-old ticket is no longer worth sending
+QUEUE_STALE = 900         # a claim this old outlived its sender (max send ~4 min): release it
 
 
 def send_payload(payload):
@@ -675,8 +676,15 @@ def queue_flush():
     """Send queued tickets oldest first. Stops at the first network error: still offline.
 
     Each file is claimed by an atomic rename, so two sessions ending together never send
-    the same ticket twice.
+    the same ticket twice. A claim left by a sender killed mid-send (sleep, shutdown)
+    goes back to the queue once stale; the rename updates ctime, not mtime.
     """
+    for claim in glob.glob(os.path.join(QUEUE_DIR, "*.json.sending")):
+        try:
+            if time.time() - os.stat(claim).st_ctime > QUEUE_STALE:
+                os.rename(claim, claim[:-len(".sending")])
+        except OSError:
+            pass
     for path in sorted(glob.glob(os.path.join(QUEUE_DIR, "*.json"))):
         claim = path + ".sending"
         try:
@@ -825,6 +833,14 @@ def main():
             queue_put(payload)
         if err and err != "not configured":
             log_error(f"telegram: {err}")
+        return
+    if arg == "--flush":  # launchd agent: on network change and every 10 min
+        if not glob.glob(os.path.join(QUEUE_DIR, "*.json")):
+            return
+        err = queue_flush()
+        # still offline or filtered (Zscaler): expected, the next run retries silently
+        if err and not err.startswith("network") and err != "not configured":
+            log_error(f"telegram flush: {err}")
         return
     if arg == "--telegram-test":
         err = telegram_send("<b>🤖 Claude Orchestrator</b>\nConnexion établie ✓")

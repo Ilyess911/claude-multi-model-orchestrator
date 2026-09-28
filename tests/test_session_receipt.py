@@ -303,6 +303,48 @@ class ReceiptQueueTests(unittest.TestCase):
         with mock.patch.object(sr, "send_payload", side_effect=AssertionError):
             self.assertEqual(sr.queue_flush(), "")
 
+    def test_stale_claim_is_released_and_sent(self):
+        sr.queue_put({"sid": "a"})
+        name = self.queued()[0]
+        os.rename(os.path.join(self.tmp.name, name), os.path.join(self.tmp.name, name + ".sending"))
+        sent = []
+        with mock.patch.object(sr, "QUEUE_STALE", -1), \
+             mock.patch.object(sr, "send_payload", lambda p: sent.append(p["sid"]) or ""):
+            sr.queue_flush()
+        self.assertEqual(sent, ["a"])
+        self.assertEqual(self.queued(), [])
+
+    def run_flush(self, send_results):
+        sent = []
+
+        def fake_send(p):
+            sent.append(p["sid"])
+            return send_results.pop(0)
+        with mock.patch.object(sr, "send_payload", fake_send), \
+             mock.patch.object(sr, "log_error") as log, \
+             mock.patch.object(sys, "argv", ["x", "--flush"]):
+            sr.main()
+        return sent, log
+
+    def test_flush_on_empty_queue_sends_nothing(self):
+        sent, log = self.run_flush([])
+        self.assertEqual(sent, [])
+        log.assert_not_called()
+
+    def test_flush_offline_keeps_queue_and_stays_silent(self):
+        sr.queue_put({"sid": "a"})
+        sent, log = self.run_flush(["network URLError"])
+        self.assertEqual(sent, ["a"])
+        self.assertEqual(len(self.queued()), 1)
+        log.assert_not_called()
+
+    def test_flush_online_empties_queue(self):
+        sr.queue_put({"sid": "a"})
+        sr.queue_put({"sid": "b"})
+        sent, _ = self.run_flush(["", ""])
+        self.assertEqual(sent, ["a", "b"])
+        self.assertEqual(self.queued(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

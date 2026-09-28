@@ -292,6 +292,12 @@ Failure rules, Telegram can never break the ticket:
   metrics only, is kept in `~/.claude/state/receipt-queue/`. The next interactive session end
   sends the queue oldest first, then its own ticket. 20 tickets at most, a week at most. Each
   file is claimed by an atomic rename, so two sessions ending together never send one twice.
+- The queue also empties without a session end: a launchd agent
+  ([`examples/com.claude.receipt-flush.plist`](../examples/com.claude.receipt-flush.plist))
+  runs `session_receipt.py --flush` on every network change and every 10 min. An empty queue
+  exits at once; a network that still blocks Telegram (Zscaler) is retried silently. A claim
+  older than 15 min (sender killed by sleep or shutdown) goes back to the queue.
+  Remove: `launchctl bootout gui/$(id -u)/com.claude.receipt-flush`.
 - Errors go to `~/.claude/logs/session-ticket-error.log` as a class or HTTP code only, never
   the token, the chat id or the message.
 - Token or chat id missing: nothing is sent, nothing is logged.

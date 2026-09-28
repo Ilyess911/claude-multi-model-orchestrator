@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Sends queued receipts as soon as a network lets them through.
+     Replace __HOME__ with your home directory, copy to ~/Library/LaunchAgents/,
+     then: launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.claude.receipt-flush.plist -->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.claude.receipt-flush</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>__HOME__/.claude/venvs/session-receipt/bin/python</string>
+    <string>__HOME__/.claude/hooks/session_receipt.py</string>
+    <string>--flush</string>
+  </array>
+  <!-- network change (wifi joined, hotspot, VPN) -->
+  <key>WatchPaths</key>
+  <array>
+    <string>/Library/Preferences/SystemConfiguration</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>600</integer>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/.claude/logs/receipt-flush.err</string>
+</dict>
+</plist>
